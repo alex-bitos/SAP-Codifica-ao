@@ -9,7 +9,7 @@ A aplicação já utilizava PostgreSQL como armazenamento permanente, mas dois d
 1. A tentativa de confirmar novamente um arquivo já importado era corretamente bloqueada pelo hash, porém o bloqueio era lançado como `Error` comum. O middleware classificava a ocorrência como HTTP 500 e escondia a causa com “Erro interno do servidor”.
 2. A geração de alguns Produtos Acabados, especialmente MaxiMesh, procurava referências pelo nome literal da característica. Na V3.11, a característica `Dimensão MaxiMesh` usa o grupo `Diâmetro Mesh`, e o valor informado pode ser atendido por uma faixa dimensional. A falta dessa resolução impedia a geração apesar de a referência existir no PostgreSQL.
 
-As duas causas foram corrigidas e validadas em PostgreSQL local descartável, com o Excel original, duas contas de usuário, reinício real do backend e testes de interface. Nenhuma escrita, migração ou implantação foi realizada em produção nesta revisão.
+As duas causas foram corrigidas e validadas em PostgreSQL local descartável, com o Excel original, duas contas de usuário, reinício real do backend e testes de interface. Durante o diagnóstico, produção foi acessada somente para leitura. Depois da autorização explícita, foi gerado um backup completo e a correção foi implantada sem nova migração ou alteração de dados.
 
 ## Rastreamento dos erros
 
@@ -138,4 +138,15 @@ A diferença entre as 606 referências totais de produção e as 574 referência
 
 ## Estado de implantação
 
-A correção está validada localmente, mas ainda não foi implantada. Conforme a regra de segurança da solicitação, o próximo passo em produção exige identificar o banco, gerar backup, apresentar as alterações/migrações pendentes e obter autorização explícita. O banco de produção não foi reinicializado, apagado ou alterado durante este trabalho.
+A correção foi implantada em 14/09/2026, depois da autorização explícita:
+
+- banco identificado: Managed Postgres `sap-codigos-db`, banco lógico `fly-db`;
+- backup completo `20260914-211413F`, status `completed`;
+- commit implantado: `07f5247bf6a35eb622d4994717da520e031df9e3`;
+- release Fly.io: versão 12, status `complete`;
+- release command: quatro migrações verificadas, nenhuma nova migração aplicada;
+- health checks: 2 de 2 aprovados;
+- smoke test externo: `/health` retornou `ok` e `/ready` retornou `ready`;
+- contagens pós-deploy: 12 naturezas, 147 categorias, 606 referências totais, 986 códigos, 81 contadores, uma importação e quatro migrações.
+
+As contagens operacionais permaneceram iguais às observadas antes do deploy. O banco não foi reinicializado, apagado ou substituído.

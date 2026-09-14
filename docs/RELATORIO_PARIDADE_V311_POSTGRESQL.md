@@ -131,6 +131,6 @@ Em todas as linhas abaixo, a API leu a configuração do PostgreSQL e o frontend
 | Auditoria Playwright das 11 categorias | Aprovado |
 | Verificação Playwright pós-reinício | Aprovado; 1.013 de 1.013 |
 
-## Conclusão e limite de implantação
+## Conclusão e implantação
 
-A paridade funcional e de dados foi demonstrada no ambiente local de homologação. O código corrigido ainda não está em produção; portanto, a conclusão técnica local não substitui a etapa operacional de backup, autorização, implantação e smoke test produtivo. A inspeção produtiva realizada foi exclusivamente de leitura e confirmou que o banco atual permanece íntegro com 986 códigos.
+A paridade funcional e de dados foi demonstrada no ambiente local de homologação. Depois da autorização explícita, o backup completo `20260914-211413F` foi concluído e o commit `07f5247bf6a35eb622d4994717da520e031df9e3` foi implantado na release 12 do Fly.io. A release command verificou as quatro migrações já aplicadas, sem alteração de dados. Os dois health checks passaram e a consulta PostgreSQL pós-deploy confirmou a preservação dos 986 códigos e das demais contagens produtivas.
