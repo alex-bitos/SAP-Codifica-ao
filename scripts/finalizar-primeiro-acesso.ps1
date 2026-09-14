@@ -29,6 +29,27 @@ function Assert-FlySucceeded([string]$Action) {
   }
 }
 
+function Import-FlySecrets([string]$TargetApp, [string[]]$Lines) {
+  if ($TargetApp -notmatch '^[a-z0-9-]+$') {
+    throw 'Nome de aplicativo Fly.io invalido.'
+  }
+
+  $payload = (($Lines -join "`n") + "`n")
+  $bytes = (New-Object System.Text.UTF8Encoding($false)).GetBytes($payload)
+  $env:SAP_CODIGOS_SECRET_PAYLOAD_B64 = [Convert]::ToBase64String($bytes)
+  try {
+    $bridge = 'powershell.exe -NoProfile -Command "$b=[Convert]::FromBase64String($env:SAP_CODIGOS_SECRET_PAYLOAD_B64);$o=[Console]::OpenStandardOutput();$o.Write($b,0,$b.Length)" | flyctl secrets import --app "' + $TargetApp + '"'
+    & cmd.exe /d /s /c $bridge
+    if ($LASTEXITCODE -ne 0) {
+      throw "A configuracao dos segredos temporarios falhou (codigo $LASTEXITCODE)."
+    }
+  } finally {
+    Remove-Item Env:\SAP_CODIGOS_SECRET_PAYLOAD_B64 -ErrorAction SilentlyContinue
+    $payload = $null
+    $bytes = $null
+  }
+}
+
 try {
   if (-not (Get-Command flyctl -ErrorAction SilentlyContinue)) {
     throw 'flyctl nao foi encontrado no PATH.'
@@ -78,14 +99,13 @@ try {
   }
 
   Write-Host 'Configurando segredos temporarios sem grava-los no historico...'
-  @(
+  Import-FlySecrets -TargetApp $App -Lines @(
     "INITIAL_ADMIN_LOGIN=$login"
     "INITIAL_ADMIN_NAME=$name"
     "INITIAL_ADMIN_PASSWORD=$password"
     "IMPORT_USER_LOGIN=$login"
     'CONFIRM_IMPORT=YES'
-  ) | & flyctl secrets import --app $App
-  Assert-FlySucceeded 'A configuracao dos segredos temporarios'
+  )
   $secretWasConfigured = $true
 
   Write-Host 'Criando o primeiro administrador...'
