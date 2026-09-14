@@ -50,19 +50,31 @@ try {
   $name = (Read-Host 'Nome do primeiro administrador [Alexandre]').Trim()
   if (-not $name) { $name = 'Alexandre' }
 
-  $securePassword = Read-Host 'Senha temporaria (12+ caracteres, maiuscula, minuscula, numero e simbolo)' -AsSecureString
-  $secureConfirmation = Read-Host 'Repita a senha temporaria' -AsSecureString
-  $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-  $confirmationPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureConfirmation)
-  $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
-  $confirmation = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($confirmationPointer)
+  while ($true) {
+    $securePassword = Read-Host 'Senha temporaria (12+ caracteres, maiuscula, minuscula, numero e simbolo)' -AsSecureString
+    $secureConfirmation = Read-Host 'Repita a senha temporaria' -AsSecureString
+    $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+    $confirmationPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureConfirmation)
+    $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+    $confirmation = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($confirmationPointer)
 
-  if ($password -ne $confirmation) { throw 'As senhas digitadas nao coincidem.' }
-  if ($password.Length -lt 12 -or $password.Length -gt 128 -or
-      $password -notmatch '[a-z]' -or $password -notmatch '[A-Z]' -or
-      $password -notmatch '\d' -or $password -notmatch '[^A-Za-z0-9]' -or
-      $password -match '[\r\n]') {
-    throw 'A senha deve ter de 12 a 128 caracteres, com maiuscula, minuscula, numero e simbolo, sem quebra de linha.'
+    $passwordIsValid = $password.Length -ge 12 -and $password.Length -le 128 -and
+      $password -match '[a-z]' -and $password -match '[A-Z]' -and
+      $password -match '\d' -and $password -match '[^A-Za-z0-9]' -and
+      $password -notmatch '[\r\n]'
+    if ($password -eq $confirmation -and $passwordIsValid) { break }
+
+    if ($password -ne $confirmation) {
+      Write-Host 'As duas senhas nao sao iguais. Tente novamente.' -ForegroundColor Yellow
+    } else {
+      Write-Host 'Use de 12 a 128 caracteres, com maiuscula, minuscula, numero e simbolo.' -ForegroundColor Yellow
+    }
+    $password = $null
+    $confirmation = $null
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($confirmationPointer)
+    $passwordPointer = [IntPtr]::Zero
+    $confirmationPointer = [IntPtr]::Zero
   }
 
   Write-Host 'Configurando segredos temporarios sem grava-los no historico...'
