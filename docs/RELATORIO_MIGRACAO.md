@@ -1,25 +1,40 @@
-# Relatório de migração
+# Relatório de migração V3.11
 
-Fonte analisada: `Banco_de_Dados_Codigos_SAP_rev3_Consolidado_Flange_Cover.xlsx`.
+Fonte: `Banco_de_Dados_Codigos_SAP_rev3_Consolidado_Flange_Cover.xlsx`.
 
-## Simulação executada
+## Conteúdo e transformação oficial
 
-| Conteúdo | Quantidade |
-|---|---:|
-| Códigos | 986 |
-| Categorias no arquivo | 145 |
-| Referências | 604 |
-| Históricos | 5 |
-| Conflitos canônicos | 0 |
-| Códigos padronizados com 14 caracteres | 281 |
-| Códigos legados preservados | 705 |
+| Conteúdo | Arquivo | Resultado efetivo no PostgreSQL de homologação |
+| --- | ---: | ---: |
+| Naturezas | 12 | 12 |
+| Códigos históricos | 986 | 986 |
+| Categorias | 145 | 147 |
+| Referências brutas | 604 | 574 ativas |
+| Históricos | 5 | 5 |
 
-O arquivo contém 198 valores históricos no campo de dígito verificador. Na migração, o código SAP completo é preservado exatamente e a coluna operacional `verification_digit` fica vazia, conforme a V3.11. Nenhum código é renumerado ou recalculado.
+As 147 categorias resultam das 145 linhas da planilha mais Tubo como Produto Intermediário (`PITU`) e a categoria histórica inativa Recheio Randômico/Produto Intermediário (`PIRR`). As 574 referências efetivas resultam da normalização de aliases e da inativação preservadora das referências obsoletas de Flange Cover. Nenhum registro existente é apagado pelas migrações.
 
-O Excel contém apenas a categoria Tubo como Matéria Prima. O importador aplica as regras oficiais da V3.11 e adiciona Tubo como Produto Intermediário (`PITU`) com os mesmos campos técnicos da categoria `MPTU`. Também cria a categoria histórica inativa `PIRR` para relacionar os 15 códigos legados de Produto Intermediário / Recheio Randomico, sem disponibilizá-la para novos códigos. Portanto, o banco final terá 147 categorias após a importação inicial.
+Os 986 códigos foram preservados exatamente, sem renumeração. Há 281 códigos com estrutura padronizada de 14 caracteres e 705 códigos legados. Os 198 dígitos verificadores históricos permanecem incorporados ao texto legado quando existentes, enquanto a coluna operacional `verification_digit` fica vazia, conforme a regra V3.11.
 
-A análise é idempotente por SHA-256. A confirmação repete a validação, usa uma única transação e atualiza os contadores com o maior sufixo de seis dígitos observado em cada prefixo estrutural. Chaves técnicas ausentes nos registros legados permanecem nulas para não bloquear históricos compatíveis; todo novo código recebe uma chave e passa pela restrição única por natureza.
+## Execução em ambiente isolado
 
-## Estado da execução
+O seed completo `seeds/v311-complete.json` foi aplicado no banco `sap_codigos_audit_20260914`. As migrações confirmadas foram:
 
-A estrutura e o conteúdo do arquivo real foram validados automaticamente. A gravação no PostgreSQL não foi executada nesta estação porque não há servidor PostgreSQL/Docker disponível e nenhuma `DATABASE_URL` foi fornecida. Execute o teste integrado e a importação confirmada em um banco vazio antes da implantação.
+1. `001_initial.sql` — estrutura, restrições e catálogos-base;
+2. `002_v311_category_parity.sql` — normalização completa das 147 categorias;
+3. `003_v311_reference_parity.sql` — paridade de referências e inativação sem exclusão.
+
+A conferência direta retornou 12 naturezas, 147 categorias, 574 referências ativas, 986 códigos históricos e 5 eventos históricos. Após sete gravações funcionais de teste, os dois usuários consultaram 993 códigos. A Machine foi reiniciada e manteve os 993 registros, com 2/2 verificações de saúde aprovadas.
+
+## Garantias do importador
+
+- valida as quatro abas e calcula SHA-256;
+- apresenta uma simulação ligada ao estado atual do banco;
+- informa existentes, inclusões, bloqueios, duplicidades e inconsistências;
+- repete a validação na confirmação;
+- usa uma única transação;
+- bloqueia repetição pelo hash;
+- atualiza contadores pelo maior sequencial histórico aplicável;
+- preserva códigos e históricos, sem exclusão ou recálculo.
+
+O banco de produção não foi alterado. A execução em produção exige backup verificado e autorização explícita.

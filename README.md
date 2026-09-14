@@ -21,9 +21,10 @@ Pré-requisitos: Node.js 22+ e PostgreSQL 16/17. O `compose.yaml` pode iniciar s
 3. Instale dependências: `npm ci`.
 4. Exporte as variáveis do `.env` no processo ou use o gerenciador de ambiente da sua preferência.
 5. Execute `npm run migrate`.
-6. Crie o primeiro administrador com as três variáveis temporárias `INITIAL_ADMIN_LOGIN`, `INITIAL_ADMIN_NAME` e `INITIAL_ADMIN_PASSWORD`: `npm run admin:create`.
-7. Remova imediatamente `INITIAL_ADMIN_PASSWORD` do ambiente.
-8. Inicie com `npm run dev` e abra `http://localhost:3000`.
+6. Em um banco vazio, carregue a base V3.11 versionada com `npm run seed:v311`.
+7. Crie o primeiro administrador com as três variáveis temporárias `INITIAL_ADMIN_LOGIN`, `INITIAL_ADMIN_NAME` e `INITIAL_ADMIN_PASSWORD`: `npm run admin:create`.
+8. Remova imediatamente `INITIAL_ADMIN_PASSWORD` do ambiente.
+9. Inicie com `npm run dev` e abra `http://localhost:3000`.
 
 O primeiro administrador é obrigado a trocar a senha no primeiro acesso. O script recusa criar outro administrador quando já existe um.
 
@@ -55,6 +56,9 @@ As permissões são aplicadas no backend. Elementos ocultos no frontend são ape
 
 - `npm test`: testes unitários, segurança e validação do Excel real.
 - `TEST_DATABASE_URL=... npm run test:integration`: inclui concorrência contra um PostgreSQL real em schema isolado.
+- `npm run audit:v311`: regenera seed, migrações e inventários e falha diante de diferenças de categoria ou referência.
+- `npm run verify:homologation`: testa migrações, dois usuários, concorrência, duplicidade, lote, exportação e banco compartilhado; use somente em banco descartável.
+- `AUDIT_APP_URL=... AUDIT_TEST_PASSWORD=... npm run test:visual`: executa os nove cenários visuais com Playwright em homologação.
 - `npm run build`: compilação TypeScript de produção.
 
-Consulte [Relatório de testes](docs/RELATORIO_TESTES.md), [Relatório de migração](docs/RELATORIO_MIGRACAO.md), [Funcionalidades V3.11](docs/FUNCIONALIDADES_V311.md), [Deploy no Fly.io](docs/DEPLOY_FLY.md) e [Backup e restauração](docs/BACKUP_RESTAURACAO.md).
+O inventário integral está em [Categorias V3.11](docs/PARIDADE_CATEGORIAS_V311.md) e [Referências V3.11](docs/PARIDADE_REFERENCIAS_V311.md). Consulte também o [Relatório comparativo](docs/RELATORIO_COMPARATIVO_V311_X_MULTIUSUARIO.md), [Relatório de testes](docs/RELATORIO_TESTES.md), [Relatório de importação](docs/RELATORIO_IMPORTACAO.md), [Relatório de migração](docs/RELATORIO_MIGRACAO.md), [Funcionalidades V3.11](docs/FUNCIONALIDADES_V311.md), [Deploy no Fly.io](docs/DEPLOY_FLY.md) e [Backup e restauração](docs/BACKUP_RESTAURACAO.md).

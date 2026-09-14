@@ -1,44 +1,64 @@
-# Implantação no Fly.io
+# Atualização no Fly.io
 
-Nenhum recurso pago deve ser criado antes da aprovação explícita do responsável.
+## Estado atual
 
-## Proposta para aprovação
+- Aplicação de produção: `sap-codigos-multiusuario`.
+- Endereço: `https://sap-codigos-multiusuario.fly.dev`.
+- Região: `gru`.
+- Aplicação: uma Machine `shared-cpu-1x`, 512 MB.
+- Banco: Managed Postgres Basic, 10 GB, acessado por `DATABASE_URL`.
+- Produção antes desta auditoria: 12 naturezas, 147 categorias, 601 referências, 986 códigos e 1 usuário.
+- Auditoria V3.11: homologada separadamente; ainda não implantada em produção.
 
-| Item | Proposta |
-|---|---|
-| Aplicação | `sap-codigos-multiusuario` |
-| Managed Postgres | `sap-codigos-db` |
-| Organização | A selecionar após `fly auth whoami` |
-| Região | `gru` (São Paulo) |
-| Aplicação | `shared-cpu-1x`, 512 MB, uma Machine mínima |
-| Banco | Managed Postgres Basic, 2 vCPU compartilhadas, 1 GB RAM, 10 GB |
-| Estimativa do banco | US$ 38/mês + US$ 2,80/mês por 10 GB, antes de impostos/tráfego |
+Não crie outro aplicativo ou banco. A próxima implantação deve atualizar os recursos existentes e só pode ocorrer depois de autorização explícita e backup verificado.
 
-A estimativa deve ser conferida no painel no momento da compra. Em setembro de 2026, a documentação do Fly.io informa que todos os planos MPG incluem alta disponibilidade, backup e pool de conexões. Referências: `https://fly.io/docs/mpg/` e `https://fly.io/docs/mpg/create-and-connect/`.
+## Preparação obrigatória
 
-## Procedimento após aprovação
+1. Confirme a conta com `flyctl auth whoami`.
+2. Confirme a branch e o commit aprovados com `git status` e `git log -1 --oneline`.
+3. Confira a saúde atual com `flyctl status --app sap-codigos-multiusuario`.
+4. Registre as contagens atuais de `users`, `natures`, `categories`, `technical_references`, `sap_codes`, `audit_log` e `database_imports`.
+5. Confirme no painel do Managed Postgres que o backup automático recente está íntegro.
+6. Gere também um `pg_dump` lógico criptografado e teste a leitura do arquivo. Não grave conexão ou senha no histórico.
+7. Revise as migrações `002_v311_category_parity.sql` e `003_v311_reference_parity.sql`. A migração 003 apenas inativa aliases obsoletos; não exclui registros.
 
-1. Instale `flyctl` pela documentação oficial.
-2. Execute `fly auth whoami`. Se não houver sessão, pare e execute manualmente `fly auth login`; não informe senha a scripts ou terceiros.
-3. Confirme organização e região com `fly orgs list` e `fly platform regions`.
-4. Revise o nome `app` em `fly.toml` e crie a aplicação sem implantar: `fly apps create sap-codigos-multiusuario --org <ORGANIZACAO>`.
-5. Crie o banco gerenciado somente após a aprovação do custo: `fly mpg create --name sap-codigos-db --org <ORGANIZACAO> --region gru --plan Basic --volume-size 10`.
-6. Obtenha o ID em `fly mpg list` e conecte o banco: `fly mpg attach <CLUSTER_ID> --app sap-codigos-multiusuario`. O comando cadastra `DATABASE_URL` como segredo.
-7. Cadastre configurações não sensíveis no `fly.toml` e segredos somente via `fly secrets set` ou entrada padrão. Nunca grave valores de segredo no histórico do shell ou no repositório.
-8. Execute `fly deploy`. O `release_command` roda as migrações e cancela o deploy se elas falharem.
-9. Verifique `https://sap-codigos-multiusuario.fly.dev/health` e `/ready`.
-10. Crie o primeiro administrador com uma senha temporária fornecida apenas ao ambiente da Machine, execute `npm run admin:create` via console seguro e remova o segredo imediatamente: `fly secrets unset INITIAL_ADMIN_PASSWORD --app sap-codigos-multiusuario`.
-11. Valide o Excel na interface e confirme a importação somente após revisar as contagens e conflitos.
-12. Escale para duas Machines e execute os testes de concorrência com o mesmo banco. Reinicie e implante novamente; confirme que a contagem e os códigos permanecem.
+## Implantação aprovada
 
-No Windows, execute `scripts/finalizar-primeiro-acesso.ps1` para concluir o primeiro acesso. O script solicita login, nome e senha no próprio PowerShell. A senha é digitada de forma oculta e enviada pela entrada padrão; o script cria o administrador, importa a planilha e remove o arquivo remoto e todos os segredos temporários ao terminar.
+```powershell
+Set-Location 'C:\Git\SAP-Codifica-ao'
+git status
+flyctl deploy --app sap-codigos-multiusuario
+flyctl status --app sap-codigos-multiusuario
+```
 
-O comando atual para Managed Postgres é `fly mpg`, não `fly postgres`; o último administra clusters não gerenciados. A ligação MPG injeta a URL com pool do PgBouncer. Referências oficiais: `https://fly.io/docs/flyctl/mpg/` e `https://fly.io/docs/flyctl/mpg-attach/`.
+O `release_command` executa `node dist/cli/migrate.js` antes da troca da Machine. Se uma migração falhar, o deploy deve ser interrompido.
 
-## Checklist de segurança
+Depois do deploy:
 
-- `fly secrets list` mostra apenas nomes/digests; confira `DATABASE_URL` sem tentar exibir o valor.
-- Remova todos os segredos temporários com `fly secrets unset <NOME>`.
+1. confirme 2/2 health checks;
+2. abra `/health` e `/ready`;
+3. entre com um Administrador e confirme carga automática das naturezas/categorias;
+4. valide busca rápida, Tubo MP/PI, Chapa, Flange e Instrumento;
+5. confira diretamente as contagens do PostgreSQL;
+6. confirme que os 986 códigos históricos não mudaram;
+7. exporte o Excel e confira as quatro abas;
+8. faça login com um segundo usuário e confirme o mesmo total;
+9. monitore logs e auditoria sem exibir segredos.
+
+## Seed e importação
+
+`npm run seed:v311` serve para banco vazio de homologação ou primeira instalação. Não deve ser executado sobre a produção já populada durante a atualização.
+
+A interface administrativa pode simular a planilha e mostrar existentes, inclusões e bloqueios. Não confirme uma nova importação em produção sem revisar o relatório e sem autorização específica, mesmo que a simulação seja válida.
+
+## Reversão
+
+Se houver falha de aplicação sem migração de dados, use o histórico de releases do Fly.io para voltar à imagem anterior. Se houver divergência de dados, interrompa escritas, preserve logs e restaure em novo banco conforme `docs/BACKUP_RESTAURACAO.md`; nunca restaure por cima do banco ativo sem decisão formal.
+
+## Segredos
+
+- `flyctl secrets list` mostra somente nomes e digests.
+- Não exiba `DATABASE_URL`, senhas, tokens ou CSRF.
 - Mantenha `ALLOWED_ORIGINS=https://sap-codigos-multiusuario.fly.dev`.
+- Remova imediatamente qualquer segredo temporário de administrador.
 - Não adicione volume à aplicação; os dados pertencem ao Managed Postgres.
-- Consulte logs apenas para eventos e mensagens sanitizadas; a aplicação não registra senha, token, CSRF ou conexão.

@@ -15,6 +15,10 @@
     "migrate": "tsx src/cli/migrate.ts",
     "admin:create": "tsx src/cli/create-admin.ts",
     "import:initial": "tsx src/cli/import-initial.ts",
+    "seed:v311": "tsx src/cli/seed-v311.ts",
+    "audit:v311": "npm run build && node scripts/generate-v311-assets.mjs",
+    "verify:homologation": "tsx src/cli/verify-homologation.ts",
+    "test:visual": "node scripts/visual-audit.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run test/integration"
@@ -36,6 +40,7 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^24.3.1",
     "@types/pg": "^8.15.5",
+    "playwright": "^1.63.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vitest": "^5.0.0"

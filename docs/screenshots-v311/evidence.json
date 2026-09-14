@@ -1,0 +1,42 @@
+{
+  "ok": true,
+  "baseUrl": "https://sap-codigos-audit-v311-20260914.fly.dev",
+  "evidence": [
+    {
+      "file": "01-tela-inicial.png",
+      "description": "Tela inicial sem campos indevidos antes da categoria."
+    },
+    {
+      "file": "02-busca-rapida.png",
+      "description": "Busca rápida preenchida com Tubo."
+    },
+    {
+      "file": "03-resultados-busca.png",
+      "description": "Resultados mostram categoria e natureza, incluindo Tubo MP e PI."
+    },
+    {
+      "file": "04-tubo-materia-prima.png",
+      "description": "Tubo MP selecionado com somente os campos oficiais."
+    },
+    {
+      "file": "05-chapa.png",
+      "description": "Chapa selecionada com sete campos oficiais."
+    },
+    {
+      "file": "06-flange.png",
+      "description": "Flange selecionado com campos separados e opções oficiais."
+    },
+    {
+      "file": "07-codigos-importados.png",
+      "description": "Consulta dos códigos históricos e dos dois códigos concorrentes."
+    },
+    {
+      "file": "08-importacao-administrativa.png",
+      "description": "Simulação administrativa com abas, existentes, inclusões, bloqueios e duplicidades."
+    },
+    {
+      "file": "09-segundo-usuario.png",
+      "description": "Segundo usuário consultando o mesmo banco PostgreSQL."
+    }
+  ]
+}

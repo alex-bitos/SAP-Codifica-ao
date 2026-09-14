@@ -86,6 +86,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 export function requireRoles(...roles: Role[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: 'Autenticação necessária.' });
+    if (req.user.mustChangePassword && req.path !== '/auth/change-password' && req.path !== '/auth/logout') {
+      return res.status(403).json({ error: 'Troque a senha inicial antes de continuar.', code: 'PASSWORD_CHANGE_REQUIRED' });
+    }
     if (!roles.includes(req.user.role)) return res.status(403).json({ error: 'Perfil sem permissão para esta operação.' });
     next();
   };

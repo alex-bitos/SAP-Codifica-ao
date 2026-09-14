@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { hashPassword, normalizeLogin, passwordError, verifyPassword } from '../src/auth.js';
+import { describe, expect, it, vi } from 'vitest';
+import { hashPassword, normalizeLogin, passwordError, requireRoles, verifyPassword } from '../src/auth.js';
 
 describe('autenticação', () => {
   it('normaliza login e rejeita senhas fracas', () => {
@@ -13,5 +13,14 @@ describe('autenticação', () => {
     expect(hash).toContain('$argon2id$'); expect(hash).not.toContain(password);
     expect(await verifyPassword(hash, password)).toBe(true);
     expect(await verifyPassword(hash, 'Senha-Errada-123!')).toBe(false);
+  });
+
+  it('bloqueia rotas funcionais até a troca da senha temporária', () => {
+    const request = { user: { role: 'Administrador', mustChangePassword: true }, path: '/codes' } as any;
+    const json = vi.fn(); const status = vi.fn(() => ({ json })); const next = vi.fn();
+    requireRoles('Administrador')(request, { status } as any, next);
+    expect(status).toHaveBeenCalledWith(403);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({ code: 'PASSWORD_CHANGE_REQUIRED' }));
+    expect(next).not.toHaveBeenCalled();
   });
 });

@@ -2,7 +2,7 @@ import type { PoolClient } from 'pg';
 import { audit } from '../audit.js';
 import { getPool, transaction } from '../db.js';
 import type { AuthUser, Category, CodeInput } from '../types.js';
-import { buildDescription, buildFlangeCover, composeSequentialCode, isFlangeCover, missingFields, normalizeInput, structuralPrefix, technicalKey, validateCompatibility, valueForCharacteristic } from '../domain/code-rules.js';
+import { buildDescription, buildFlangeCover, composeSequentialCode, isFlangeCover, missingFields, normalizedTechnicalDescription, normalizeInput, structuralPrefix, technicalKey, validateCompatibility, valueForCharacteristic } from '../domain/code-rules.js';
 import { canonicalGroup, normalizeText } from '../domain/normalization.js';
 
 export class ConflictError extends Error { status = 409; }
@@ -55,6 +55,12 @@ async function prepare(client: PoolClient, inputValue: CodeInput) {
   const duplicate = await client.query(`SELECT id, sap_code FROM sap_codes
     WHERE nature_id=$1 AND technical_key=$2 AND status IN ('Ativo','Aprovado','Provisório') LIMIT 1`, [category.natureId, key]);
   if (duplicate.rows[0]) throw new ConflictError(`Item já cadastrado no código ${duplicate.rows[0].sap_code}.`);
+  const legacyCandidates = await client.query(`SELECT sap_code,standardized_description FROM sap_codes
+    WHERE nature_id=$1 AND category_id=$2 AND (technical_key IS NULL OR technical_key='')
+      AND status IN ('Ativo','Aprovado','Provisório')`, [category.natureId, category.id]);
+  const legacyDuplicate = legacyCandidates.rows.find((row) =>
+    normalizedTechnicalDescription(row.standardized_description) === normalizedTechnicalDescription(description));
+  if (legacyDuplicate) throw new ConflictError(`Item já cadastrado no código ${legacyDuplicate.sap_code}.`);
   if (isFlangeCover(category)) {
     const flange = buildFlangeCover(input.attributes, await flangeOverrides(client));
     return { input, category, description: flange.description, key, c1: flange.parts.modelo, c2: flange.parts.material, v1: input.attributes.modelo, v2: input.attributes.material, special: true, code: flange.code, prefix: '' };

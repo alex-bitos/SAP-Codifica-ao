@@ -43,9 +43,15 @@
         <section id="view-generate" class="view active">
           <div class="section-heading"><div><h2>Gerar código SAP</h2><p>O código definitivo é reservado somente na confirmação.</p></div><span class="pill">6 dígitos · sem DV</span></div>
           <form id="generateForm" class="panel">
-            <div class="form-grid"><label>Natureza<select id="natureSelect" required></select></label><label>Categoria<select id="categorySelect" required></select></label></div>
-            <div id="dynamicFields" class="form-grid dynamic-fields"></div>
-            <details><summary>Dados administrativos</summary><div class="form-grid detail-grid"><label>Unidade<input name="unit"></label><label>Fabricante<input name="manufacturer"></label><label>Modelo<input name="model"></label><label>TAG<input name="tag"></label><label>NCP<input name="ncp"></label><label>Projeto<input name="project"></label><label>Número de série<input name="serialNumber"></label><label class="wide">Observação<textarea name="notes"></textarea></label></div></details>
+            <div id="catalogError" class="catalog-error hidden" role="alert">Não foi possível carregar as naturezas e categorias do banco central. O gerador ficará indisponível até a conexão ser restabelecida.</div>
+            <section class="category-finder" aria-labelledby="categoryFinderTitle">
+              <label id="categoryFinderTitle" for="categoryFinderText">Busca rápida de categoria</label>
+              <div class="finder-row"><input id="categoryFinderText" type="search" autocomplete="off" placeholder="Ex.: Instrumento, Válvula, Tubo, Flange, MaxiMesh ou Limpeza"><button id="categoryFinderButton" type="button" class="secondary">Buscar</button></div>
+              <div id="categoryFinderResults" class="finder-results" aria-live="polite"><span class="muted">Digite parte do nome da categoria ou da natureza.</span></div>
+            </section>
+            <div class="form-grid"><label>Natureza<select id="natureSelect" required disabled></select></label><label>Categoria<select id="categorySelect" required disabled></select></label></div>
+            <p class="responsible-line">Responsável: <strong id="responsibleName"></strong> <span class="muted">(usuário autenticado)</span></p>
+            <div id="dynamicFields" class="form-grid dynamic-fields"><div class="empty">Selecione uma categoria.</div></div>
             <div class="actions"><button id="previewButton" type="button" class="secondary">Calcular e verificar</button><button id="confirmButton" type="submit" disabled>Confirmar e incluir</button></div>
           </form>
           <article id="previewCard" class="preview-card hidden"><div><span>Código proposto</span><strong id="previewCode"></strong></div><div><span>Descrição padronizada</span><p id="previewDescription"></p></div><small>A prévia é estimada. Em caso de concorrência, o servidor atribui o próximo código disponível.</small></article>
@@ -54,7 +60,7 @@
 
         <section id="view-codes" class="view">
           <div class="section-heading"><div><h2>Códigos cadastrados</h2><p>Resultados consultados diretamente no PostgreSQL.</p></div><button id="exportButton" data-role="write">Exportar Excel</button></div>
-          <div class="panel filters"><input id="codeSearch" placeholder="Código, descrição, TAG ou modelo"><select id="codeCategory"><option value="">Todas as categorias</option></select><select id="codeStatus"><option value="">Todas as situações</option><option>Provisório</option><option>Aprovado</option><option>Ativo</option><option>Cancelado</option><option>Inativo</option></select><button id="searchButton" class="secondary">Pesquisar</button></div>
+          <div class="panel filters"><input id="codeSearch" placeholder="Código, descrição, TAG ou modelo"><select id="codeNature"><option value="">Todas as naturezas</option></select><select id="codeCategory"><option value="">Todas as categorias</option></select><select id="codeStatus"><option value="">Todas as situações</option><option>Provisório</option><option>Aprovado</option><option>Ativo</option><option>Cancelado</option><option>Inativo</option></select><button id="searchButton" class="secondary">Pesquisar</button></div>
           <div class="table-card"><table><thead><tr><th>Código SAP</th><th>Descrição</th><th>Natureza</th><th>Categoria</th><th>TAG</th><th>Situação</th></tr></thead><tbody id="codesBody"></tbody></table><div class="pagination"><button id="prevPage" class="ghost">Anterior</button><span id="pageInfo"></span><button id="nextPage" class="ghost">Próxima</button></div></div>
         </section>
 
@@ -65,8 +71,8 @@
         </section>
 
         <section id="view-catalogs" class="view">
-          <div class="section-heading"><div><h2>Cadastros técnicos</h2><p>Categorias e referências usadas nas regras de geração.</p></div></div>
-          <div class="split"><div class="table-card"><div class="card-head"><h3>Categorias</h3><input id="catalogSearch" placeholder="Filtrar"></div><table><thead><tr><th>Natureza</th><th>Categoria</th><th>Base</th><th>Situação</th></tr></thead><tbody id="categoriesBody"></tbody></table></div><div class="table-card"><div class="card-head"><h3>Referências</h3><span id="referenceCount"></span></div><table><thead><tr><th>Grupo</th><th>Descrição</th><th>Código</th></tr></thead><tbody id="referencesBody"></tbody></table></div></div>
+          <div class="section-heading"><div><h2>Cadastros técnicos</h2><p>Categorias e referências usadas nas regras de geração.</p></div><div class="actions compact"><button id="newCategoryButton">Nova categoria</button><button id="newReferenceButton" class="secondary">Nova referência</button></div></div>
+          <div class="split"><div class="table-card"><div class="card-head"><h3>Categorias</h3><input id="catalogSearch" placeholder="Filtrar"></div><table><thead><tr><th>Natureza</th><th>Categoria</th><th>Base</th><th>Situação</th><th>Ação</th></tr></thead><tbody id="categoriesBody"></tbody></table></div><div class="table-card"><div class="card-head"><h3>Referências</h3><span id="referenceCount"></span></div><table><thead><tr><th>Grupo</th><th>Descrição</th><th>Código</th><th>Situação</th><th>Ação</th></tr></thead><tbody id="referencesBody"></tbody></table></div></div>
         </section>
 
         <section id="view-users" class="view">
@@ -77,7 +83,7 @@
         <section id="view-database" class="view">
           <div class="section-heading"><div><h2>Importação e auditoria</h2><p>Valide antes de confirmar. Arquivos repetidos são bloqueados pelo hash.</p></div></div>
           <div class="panel upload-panel"><input id="databaseFile" type="file" accept=".xlsx"><button id="validateDatabase">Simular importação</button><button id="confirmDatabase" disabled>Confirmar importação</button><div id="importReport"></div></div>
-          <div class="table-card"><div class="card-head"><h3>Auditoria recente</h3><button id="refreshAudit" class="secondary">Atualizar</button></div><table><thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Entidade</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+          <div class="table-card"><div class="card-head"><h3>Auditoria recente</h3><button id="refreshAudit" class="secondary">Atualizar</button></div><table><thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Entidade</th><th>Detalhes</th></tr></thead><tbody id="auditBody"></tbody></table></div>
         </section>
       </main>
     </div>

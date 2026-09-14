@@ -6,9 +6,11 @@ import { z } from 'zod';
 import { authenticate, changePassword, createSession, csrfProtection, hashPassword, login, logout, normalizeLogin, passwordError, requireAuth, requireRoles } from './auth.js';
 import { audit } from './audit.js';
 import { getPool, transaction } from './db.js';
+import { fieldDefinitions } from './domain/field-config.js';
+import { searchCategories } from './domain/category-search.js';
 import { createBatch, createCode, previewCode } from './services/codes.js';
 import { exportDatabase } from './services/exporter.js';
-import { analyzeWorkbook, importWorkbook } from './services/importer.js';
+import { analyzeWorkbookAgainstDatabase, importWorkbook } from './services/importer.js';
 import type { AuthUser, Role } from './types.js';
 
 const router = Router();
@@ -82,9 +84,10 @@ router.post('/users/:id/reset-password', requireRoles('Administrador'), asyncRou
 
 router.get('/codes', requireAuth, asyncRoute(async (req, res) => {
   const page = Math.max(1, Number(req.query.page || 1)); const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize || 25)));
-  const search = String(req.query.search || '').trim(); const category = String(req.query.category || ''); const status = String(req.query.status || '');
+  const search = String(req.query.search || '').trim(); const nature = String(req.query.nature || ''); const category = String(req.query.category || ''); const status = String(req.query.status || '');
   const params: unknown[] = []; const where: string[] = [];
   if (search) { params.push(`%${search}%`); where.push(`(s.sap_code ILIKE $${params.length} OR s.standardized_description ILIKE $${params.length} OR s.tag ILIKE $${params.length} OR s.model ILIKE $${params.length})`); }
+  if (nature) { params.push(nature); where.push(`s.nature_id=$${params.length}`); }
   if (category) { params.push(category); where.push(`s.category_id=$${params.length}`); }
   if (status) { params.push(status); where.push(`s.status=$${params.length}`); }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -126,6 +129,25 @@ router.get('/natures', requireAuth, asyncRoute(async (_req, res) => { const resu
 router.get('/categories', requireAuth, asyncRoute(async (req, res) => {
   const nature = String(req.query.nature || ''); const result = await getPool().query(`SELECT c.id,c.nature_id AS "natureId",n.name AS nature,n.code AS "natureCode",c.name,c.base_code AS "baseCode",c.description_format AS "descriptionFormat",c.characteristic_1 AS "characteristic1",c.characteristic_2 AS "characteristic2",c.code_formula AS "codeFormula",c.required_fields AS "requiredFields",c.example,c.active FROM categories c JOIN natures n ON n.id=c.nature_id WHERE ($1='' OR n.id::text=$1) ORDER BY c.name,n.name`, [nature]); res.json({ items: result.rows });
 }));
+router.get('/category-search', requireAuth, asyncRoute(async (req, res) => {
+  const query = String(req.query.q || '').trim();
+  if (!query) return res.json({ items: [] });
+  const result = await getPool().query(`SELECT c.id,c.nature_id AS "natureId",n.name AS nature,n.code AS "natureCode",c.name,
+    c.base_code AS "baseCode",c.description_format AS "descriptionFormat",c.characteristic_1 AS "characteristic1",
+    c.characteristic_2 AS "characteristic2",c.code_formula AS "codeFormula",c.required_fields AS "requiredFields",c.example,c.active
+    FROM categories c JOIN natures n ON n.id=c.nature_id WHERE n.active=true`);
+  res.json({ items: searchCategories(result.rows, query) });
+}));
+router.get('/categories/:id/fields', requireAuth, asyncRoute(async (req, res) => {
+  const categoryResult = await getPool().query(`SELECT c.id,c.nature_id AS "natureId",n.name AS nature,n.code AS "natureCode",c.name,
+    c.base_code AS "baseCode",c.description_format AS "descriptionFormat",c.characteristic_1 AS "characteristic1",
+    c.characteristic_2 AS "characteristic2",c.code_formula AS "codeFormula",c.required_fields AS "requiredFields",c.example,c.active
+    FROM categories c JOIN natures n ON n.id=c.nature_id WHERE c.id=$1`, [req.params.id]);
+  if (!categoryResult.rows[0]) return res.status(404).json({ error: 'Categoria não encontrada.' });
+  const referenceResult = await getPool().query(`SELECT reference_group AS "group",description,code,active
+    FROM technical_references WHERE active=true ORDER BY reference_group,description`);
+  res.json({ items: fieldDefinitions(categoryResult.rows[0], referenceResult.rows) });
+}));
 router.get('/references', requireAuth, asyncRoute(async (req, res) => { const group = String(req.query.group || ''); const result = await getPool().query(`SELECT id,reference_group AS "group",description,code,active,notes FROM technical_references WHERE ($1='' OR reference_group=$1) ORDER BY reference_group,description`, [group]); res.json({ items: result.rows }); }));
 
 router.post('/categories', requireRoles('Administrador'), asyncRoute(async (req, res) => {
@@ -144,11 +166,11 @@ router.patch('/references/:id', requireRoles('Administrador'), asyncRoute(async(
 router.post('/admin/import/validate', requireRoles('Administrador'), upload.single('file'), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Envie um arquivo XLSX.' });
   if (!/\.xlsx?$/i.test(req.file.originalname)) return res.status(400).json({ error: 'Formato de arquivo não permitido.' });
-  const analysis = analyzeWorkbook(req.file.buffer, req.file.originalname); const { rows: _rows, ...publicAnalysis } = analysis; res.json(publicAnalysis);
+  res.json(await analyzeWorkbookAgainstDatabase(req.file.buffer, req.file.originalname));
 }));
 router.post('/admin/import/confirm', requireRoles('Administrador'), upload.single('file'), asyncRoute(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Envie novamente o arquivo validado.' }); const expectedHash=String(req.body?.fileHash||''); if(!/^[a-f0-9]{64}$/.test(expectedHash))return res.status(400).json({error:'Hash de validação inválido.'}); res.status(201).json({result:await importWorkbook(req.file.buffer,req.file.originalname,expectedHash,req.user!,req.ip)});
 }));
-router.get('/audit', requireRoles('Administrador'), asyncRoute(async (req,res)=>{const page=Math.max(1,Number(req.query.page||1));const size=Math.min(100,Math.max(1,Number(req.query.pageSize||50)));const result=await getPool().query(`SELECT id,actor_name AS "actorName",action,entity_type AS "entityType",entity_id AS "entityId",details,ip_address AS "ipAddress",created_at AS "createdAt" FROM audit_log ORDER BY created_at DESC LIMIT $1 OFFSET $2`,[size,(page-1)*size]);res.json({items:result.rows,page,pageSize:size});}));
+router.get('/audit', requireRoles('Administrador'), asyncRoute(async (req,res)=>{const page=Math.max(1,Number(req.query.page||1));const size=Math.min(100,Math.max(1,Number(req.query.pageSize||50)));const result=await getPool().query(`SELECT id,actor_name AS "actorName",action,entity_type AS "entityType",entity_id AS "entityId",before_data AS "beforeData",after_data AS "afterData",details,ip_address AS "ipAddress",created_at AS "createdAt" FROM audit_log ORDER BY created_at DESC LIMIT $1 OFFSET $2`,[size,(page-1)*size]);res.json({items:result.rows,page,pageSize:size});}));
 
 export default router;

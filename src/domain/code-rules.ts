@@ -1,6 +1,8 @@
 import type { Category, CodeInput } from '../types.js';
 import { canonicalCode, fieldKey, normalizeTechnicalValue, normalizeText } from './normalization.js';
 
+export const ADMINISTRATIVE_FIELDS = new Set(['responsavel', 'tag', 'ncp', 'ncp_projeto', 'ncpprojeto', 'projeto', 'numero_de_serie', 'numerodeserie']);
+
 export const FLANGE_COVER_CATALOG = {
   modelo: { EconoGard: 'EG', MetalGard: 'MG', SpraGard: 'SG', ValveGard: 'VG', VueGard: 'VU', ExpandoGard: 'EX' },
   material: { PP: 'P1', PTFE: 'P2', PE: 'P3', PVC: 'P4', '316L': 'P5', 'Aço Galvanizado': 'P6' },
@@ -23,9 +25,8 @@ export function validateCompatibility(category: Category, attributes: Record<str
 }
 
 export function technicalKey(category: Category, attributes: Record<string, string>): string {
-  const administrative = new Set(['tag', 'ncp', 'projeto', 'numero_de_serie', 'responsavel', 'observacao', 'unidade', 'fabricante']);
   const parts = category.requiredFields
-    .filter((field) => !administrative.has(fieldKey(field)))
+    .filter((field) => !ADMINISTRATIVE_FIELDS.has(fieldKey(field)))
     .map((field) => `${fieldKey(field)}=${normalizeTechnicalValue(field, attributes[fieldKey(field)])}`);
   return `${normalizeText(category.nature)}|${normalizeText(category.name)}|${parts.join('|')}`;
 }
@@ -41,8 +42,27 @@ export function buildDescription(category: Category, attributes: Record<string, 
     return `Flange ${attributes.tipo || ''} - ${attributes.norma_do_material || ''} ${attributes.material || ''} - NPS ${String(attributes.diametro_nominal || '').replace(/^NPS\s*/i, '')} ${attributes.face || ''} - ${standard} #${String(attributes.classe_de_pressao || '').replace(/(?:class|classe|#)/ig, '').trim()} - ${attributes.origem || ''}`
       .replace(/\bNPS\s+NPS\b/ig, 'NPS').replace(/\bASME\s+ASME\b/ig, 'ASME').replace(/\s{2,}/g, ' ').trim();
   }
-  return category.descriptionFormat.replace(/<([^>]+)>/g, (_match, label) => attributes[fieldKey(label)] || 'NA')
-    .replace(/\s{2,}/g, ' ').trim();
+  let description = category.descriptionFormat
+    .replace(/\bNCP\s*<ncp>/gi, '')
+    .replace(/\bTAG\s*<tag>/gi, '')
+    .replace(/\bProjeto\s*<projeto>/gi, '')
+    .replace(/\b(?:Número de Série|Numero de Serie|Série|Serie)\s*<(?:número de série|numero de serie)>/gi, '');
+  description = description.replace(/<([^>]+)>/g, (_match, inside) => {
+    const alternatives = String(inside).split('|').map((item) => fieldKey(item.replace(/\?/g, '').trim()));
+    if (alternatives.some((key) => ADMINISTRATIVE_FIELDS.has(key))) return '';
+    for (const key of alternatives) if (attributes[key]) return attributes[key];
+    return '';
+  });
+  description = description.replace(/\borigem\b/gi, attributes.origem || '')
+    .replace(/(mm)\s*mm\b/gi, 'mm').replace(/(["″])\s*["″]/g, '"')
+    .replace(/\s+-\s+-/g, ' - ').replace(/\s{2,}/g, ' ').replace(/\s+([,;])/g, '$1').trim();
+  return description.replace(/^[a-zá-ú]/, (character) => character.toUpperCase()).slice(0, 200);
+}
+
+export function normalizedTechnicalDescription(value: string) {
+  return normalizeText(value).replace(/\basme\s+(?=b\s*\d)/g, '').replace(/\bnps(?:\s+nps)+\b/g, 'nps')
+    .replace(/\bf\s+(?=\d)/g, 'f').replace(/\bsa\s+(?=\d)/g, 'sa')
+    .replace(/\bclass\s+(?=\d)/g, '').replace(/\s+/g, ' ').trim();
 }
 
 export function missingFields(category: Category, attributes: Record<string, string>): string[] {

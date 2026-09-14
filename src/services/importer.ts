@@ -3,7 +3,9 @@ import * as XLSX from 'xlsx';
 import type { PoolClient } from 'pg';
 import { audit } from '../audit.js';
 import { canonicalCode, normalizeText } from '../domain/normalization.js';
-import { transaction } from '../db.js';
+import { v311CategoryRows } from '../domain/v311-category-rules.js';
+import { v311ReferenceIdentityGroup, v311ReferenceRows } from '../domain/v311-reference-rules.js';
+import { getPool, transaction } from '../db.js';
 import type { AuthUser } from '../types.js';
 
 const REQUIRED_HEADERS = {
@@ -17,9 +19,12 @@ type WorkbookRows = Record<keyof typeof REQUIRED_HEADERS, Record<string, unknown
 export interface ImportAnalysis {
   fileName: string;
   fileHash: string;
+  sheetNames: string[];
   counts: { codes: number; categories: number; references: number; history: number };
   canonicalDuplicates: { canonicalCode: string; rows: number[] }[];
   technicalDuplicates: { key: string; rows: number[] }[];
+  referenceDuplicates: { key: string; rows: number[] }[];
+  inconsistencies: string[];
   warnings: string[];
   valid: boolean;
 }
@@ -57,17 +62,59 @@ export function analyzeWorkbook(buffer: Buffer, fileName: string): ImportAnalysi
   const technicalDuplicates = duplicates(rows.Codigos.map((row, index) => ({
     key: String(row.ChaveTecnica || '').trim(), row: index + 2,
   }))).map(([key, lineRows]) => ({ key, rows: lineRows }));
+  const referenceDuplicates = duplicates(rows.Referencias.map((row, index) => ({
+    key: `${v311ReferenceIdentityGroup(String(row.Grupo || ''))}|${normalizeText(row.Descricao)}`, row: index + 2,
+  }))).map(([key, lineRows]) => ({ key, rows: lineRows }));
   const warnings: string[] = [];
+  const inconsistencies: string[] = [];
   const populatedDv = rows.Codigos.filter((row) => String(row.DigitoVerificador || '').trim()).length;
   if (populatedDv) warnings.push(`${populatedDv} dígito(s) verificador(es) histórico(s) serão armazenados vazios, sem alterar o Código SAP.`);
   const legacy = rows.Codigos.filter((row) => canonicalCode(row.CodigoSAP).length !== 14).length;
   if (legacy) warnings.push(`${legacy} código(s) legado(s) serão preservados exatamente.`);
   return {
-    fileName, fileHash: crypto.createHash('sha256').update(buffer).digest('hex'), rows,
+    fileName, fileHash: crypto.createHash('sha256').update(buffer).digest('hex'), sheetNames: Object.keys(REQUIRED_HEADERS), rows,
     counts: { codes: rows.Codigos.length, categories: rows.Categorias.length, references: rows.Referencias.length, history: rows.Historico.length },
-    canonicalDuplicates, technicalDuplicates, warnings,
+    canonicalDuplicates, technicalDuplicates, referenceDuplicates, inconsistencies, warnings,
     valid: canonicalDuplicates.length === 0 && technicalDuplicates.length === 0,
   };
+}
+
+export async function analyzeWorkbookAgainstDatabase(buffer: Buffer, fileName: string) {
+  const analysis = analyzeWorkbook(buffer, fileName);
+  const [codeRows, categoryRows, referenceRows, importRows] = await Promise.all([
+    getPool().query('SELECT canonical_code FROM sap_codes'),
+    getPool().query(`SELECT n.name AS nature,c.name,c.base_code FROM categories c JOIN natures n ON n.id=c.nature_id`),
+    getPool().query('SELECT reference_group,description FROM technical_references'),
+    getPool().query('SELECT status FROM database_imports WHERE file_hash=$1', [analysis.fileHash]),
+  ]);
+  const existingCodes = new Set(codeRows.rows.map((row) => row.canonical_code));
+  const effectiveCategories = v311CategoryRows(analysis.rows.Categorias);
+  const existingCategories = new Set(categoryRows.rows.map((row) => `${normalizeText(row.nature)}|${normalizeText(row.name)}`));
+  const effectiveReferences = v311ReferenceRows(analysis.rows.Referencias);
+  const existingReferences = new Set(referenceRows.rows.map((row) => `${v311ReferenceIdentityGroup(row.reference_group)}|${normalizeText(row.description)}`));
+  const existing = {
+    codes: analysis.rows.Codigos.filter((row) => existingCodes.has(canonicalCode(row.CodigoSAP))).length,
+    categories: effectiveCategories.filter((row) => existingCategories.has(`${normalizeText(row.Natureza)}|${normalizeText(row.Categoria)}`)).length,
+    references: effectiveReferences.filter((row) => existingReferences.has(`${v311ReferenceIdentityGroup(String(row.Grupo || ''))}|${normalizeText(row.Descricao)}`)).length,
+    history: importRows.rows[0]?.status === 'COMPLETED' ? analysis.counts.history : 0,
+  };
+  const toInsert = {
+    codes: analysis.counts.codes - existing.codes,
+    categories: effectiveCategories.length - existing.categories,
+    references: effectiveReferences.length - existing.references,
+    history: analysis.counts.history - existing.history,
+  };
+  const blocked = {
+    codes: new Set([...analysis.canonicalDuplicates.flatMap((item) => item.rows), ...analysis.technicalDuplicates.flatMap((item) => item.rows)]).size,
+    categories: 0, references: 0, history: 0,
+  };
+  const inconsistencies = [...analysis.inconsistencies];
+  if (analysis.canonicalDuplicates.length) inconsistencies.push(`${analysis.canonicalDuplicates.length} conflito(s) de código canônico.`);
+  if (analysis.technicalDuplicates.length) inconsistencies.push(`${analysis.technicalDuplicates.length} conflito(s) de chave técnica.`);
+  if (analysis.referenceDuplicates.length) analysis.warnings.push(`${analysis.referenceDuplicates.length} duplicidade(s) semântica(s) de referência serão mescladas.`);
+  if (importRows.rows[0]) inconsistencies.push(`Arquivo já registrado com situação ${importRows.rows[0].status}.`);
+  const { rows: _rows, ...publicAnalysis } = analysis;
+  return { ...publicAnalysis, effectiveCounts: { ...analysis.counts, categories: effectiveCategories.length, references: effectiveReferences.length }, existing, toInsert, blocked, inconsistencies };
 }
 
 const value = (row: Record<string, unknown>, key: string) => String(row[key] ?? '').trim();
@@ -79,53 +126,8 @@ export function importedSequential(rawValue: unknown, canonical: string) {
   return canonical.length === 14 && /^\d{6}$/.test(canonical.slice(8)) ? canonical.slice(8) : '';
 }
 
-function officialCategory(row: Record<string, unknown>) {
-  const copy = { ...row };
-  const category = normalizeText(value(copy, 'Categoria'));
-  if (category === 'tubo') {
-    copy.FormatoDescricao = 'Tubo - <norma> <material> - <diametro> <schedule ou espessura> - <origem>';
-    copy.Caracteristica1 = 'Material'; copy.Caracteristica2 = 'Diâmetro Tubo';
-    copy.FormulaCodigo = 'Código Base + Material + Diâmetro Tubo + Sequencial';
-    copy.CamposObrigatorios = 'norma; material; diametro; schedule ou espessura; origem';
-  }
-  if (category === 'flange') {
-    copy.FormatoDescricao = 'Flange <tipo> - <norma do material> <material> - NPS <diametro nominal> <face> - <norma dimensional> #<classe de pressao> - <origem>';
-    copy.CamposObrigatorios = 'tipo; norma do material; material; diametro nominal; face; norma dimensional; classe de pressao; origem';
-  }
-  if (category === 'pestana') {
-    copy.FormatoDescricao = 'Pestana <tipo> - <norma do material> <material> - <norma dimensional> NPS <diametro nominal> x #<espessura> - <origem>';
-    copy.CamposObrigatorios = 'tipo; norma do material; material; norma dimensional; diametro nominal; espessura; origem';
-  }
-  if (category === 'uniao roscada' || category === 'uniao solda de encaixe') {
-    const socket = category === 'uniao solda de encaixe';
-    copy.FormatoDescricao = `${socket ? 'Uniao Solda de Encaixe' : 'Uniao Roscada'} - <norma do material> <material> - <norma dimensional> <classe de pressao># NPS <diametro nominal> ${socket ? 'SW' : 'NPT'} - <origem>`;
-    copy.CamposObrigatorios = 'norma do material; material; norma dimensional; classe de pressao; diametro nominal; origem';
-  }
-  if (category === 'flange cover') {
-    copy.Natureza = 'Produto Acabado'; copy.CodigoBase = 'PAFC';
-    copy.FormatoDescricao = '<modelo> / <material> / <diametro> / <classe> / <dreno>';
-    copy.Caracteristica1 = 'Modelo'; copy.Caracteristica2 = 'Material';
-    copy.FormulaCodigo = 'PAFC + Modelo(2) + Material(2) + Diâmetro(3) + Classe de Pressão(2) + Dreno(1)';
-    copy.CamposObrigatorios = 'modelo; material; diametro; classe; dreno';
-  }
-  return copy;
-}
-
 export function categoryRowsForImport(rows: Record<string, unknown>[]) {
-  const categoryRows = rows.map(officialCategory);
-  const hasCategory = (nature: string, category: string) => categoryRows.some((row) =>
-    normalizeText(value(row, 'Natureza')) === nature && normalizeText(value(row, 'Categoria')) === category);
-  const tubeMp = categoryRows.find((row) =>
-    normalizeText(value(row, 'Categoria')) === 'tubo' && normalizeText(value(row, 'Natureza')) === 'materia prima');
-  if (tubeMp && !hasCategory('produto intermediario', 'tubo')) {
-    categoryRows.push({ ...tubeMp, Natureza: 'Produto Intermediário', CodigoBase: 'PITU' });
-  }
-  const randomPacking = categoryRows.find((row) =>
-    normalizeText(value(row, 'Categoria')) === 'recheio randomico' && normalizeText(value(row, 'Natureza')) === 'materia prima');
-  if (randomPacking && !hasCategory('produto intermediario', 'recheio randomico')) {
-    categoryRows.push({ ...randomPacking, Natureza: 'Produto Intermediário', CodigoBase: 'PIRR', Situacao: 'Inativo' });
-  }
-  return categoryRows;
+  return v311CategoryRows(rows);
 }
 
 async function natureId(client: PoolClient, name: string, code = '') {
@@ -161,7 +163,7 @@ export async function importWorkbook(buffer: Buffer, fileName: string, expectedH
       categoryIds.set(`${normalizeText(value(row, 'Natureza'))}|${normalizeText(value(row, 'Categoria'))}`, result.rows[0].id);
     }
 
-    for (const row of analysis.rows.Referencias) {
+    for (const row of v311ReferenceRows(analysis.rows.Referencias)) {
       if (!value(row, 'Grupo') || !value(row, 'Descricao')) continue;
       await client.query(`INSERT INTO technical_references(reference_group,description,code,active,notes)
         VALUES ($1,$2,$3,$4,$5)

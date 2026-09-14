@@ -1,0 +1,23 @@
+{
+  "source": {
+    "defaultCategories": 140,
+    "defaultReferences": 603,
+    "defaultCodes": 83
+  },
+  "workbook": {
+    "codes": 986,
+    "categories": 145,
+    "references": 604,
+    "history": 5
+  },
+  "effective": {
+    "categories": 147,
+    "references": 574
+  },
+  "web": {
+    "categories": 147,
+    "references": 574
+  },
+  "categoryDifferences": [],
+  "referenceDifferences": []
+}
