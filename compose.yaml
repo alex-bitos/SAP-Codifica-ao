@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sap_codigos}
+      POSTGRES_USER: ${POSTGRES_USER:-sap_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env local}
+    ports:
+      - "5432:5432"
+    volumes:
+      - sap_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sap_app} -d ${POSTGRES_DB:-sap_codigos}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  sap_postgres_data:
