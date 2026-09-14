@@ -1,10 +1,14 @@
 [CmdletBinding()]
 param(
   [string]$App = 'sap-codigos-multiusuario',
-  [string]$Workbook = (Join-Path $PSScriptRoot '..\Banco_de_Dados_Codigos_SAP_rev3_Consolidado_Flange_Cover.xlsx')
+  [string]$Workbook = ''
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $Workbook) {
+  $Workbook = Join-Path $PSScriptRoot '..\Banco_de_Dados_Codigos_SAP_rev3_Consolidado_Flange_Cover.xlsx'
+}
+$Workbook = [System.IO.Path]::GetFullPath($Workbook)
 $temporaryRemoteFile = '/tmp/sap-codigos-importacao-inicial.xlsx'
 $secretNames = @(
   'INITIAL_ADMIN_LOGIN',
