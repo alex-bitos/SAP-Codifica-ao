@@ -480,6 +480,6 @@ Esta seção registra o encerramento de cada item e substitui os campos “pende
 - Resultado efetivo das regras oficiais: 147 categorias e 574 referências ativas.
 - PostgreSQL de homologação: 12 naturezas, 147 categorias, 574 referências ativas e 986 códigos históricos inalterados.
 - Após os cenários funcionais: 993 códigos totais, incluindo sete códigos de teste; ambos os usuários viram a mesma quantidade.
-- Migrações `001`, `002` e `003` homologadas; a reconciliação da produção antiga originou a migração complementar `004`, que inativa sem excluir seis modelos já versionados no domínio e 21 aliases semânticos de diâmetro.
-- Produção preservada. O próximo passo é backup e implantação somente após autorização explícita.
+- Migrações `001`, `002`, `003` e `004` aplicadas. A reconciliação da produção antiga originou a migração complementar `004`, que inativou sem excluir seis modelos já versionados no domínio e 21 aliases semânticos de diâmetro.
+- Produção implantada após autorização e backup completo `20260914-194642F`: `/health=ok`, `/ready=ready`, Machine 2/2, 147 categorias, 574 referências ativas e 986/986 códigos históricos presentes.
 - Encerramento da homologação: aplicação temporária destruída e usuário PostgreSQL temporário revogado; o banco isolado permaneceu sem credencial ativa.

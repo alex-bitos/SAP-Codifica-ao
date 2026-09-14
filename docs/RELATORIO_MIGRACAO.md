@@ -38,4 +38,4 @@ A conferência direta retornou 12 naturezas, 147 categorias, 574 referências at
 - atualiza contadores pelo maior sequencial histórico aplicável;
 - preserva códigos e históricos, sem exclusão ou recálculo.
 
-Na implantação autorizada de 14/09/2026, foi criado e confirmado o backup completo `20260914-194642F` antes das migrações. A primeira verificação pós-deploy revelou que a migração 003 não abrangia a grafia com dois-pontos nem 21 aliases semânticos existentes no banco antigo; a migração 004 foi criada para completar a paridade sem excluir registros.
+Na implantação autorizada de 14/09/2026, foi criado e confirmado o backup completo `20260914-194642F` antes das migrações. A primeira verificação pós-deploy revelou que a migração 003 não abrangia a grafia com dois-pontos nem 21 aliases semânticos existentes no banco antigo; a migração 004 completou a paridade sem excluir registros. A consulta final de produção confirmou 601 referências preservadas, 574 ativas e únicas, zero extras e zero ausentes em relação à V3.11.
