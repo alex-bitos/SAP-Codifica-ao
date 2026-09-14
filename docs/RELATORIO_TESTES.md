@@ -14,7 +14,7 @@ Após a coleta das evidências, a aplicação temporária foi destruída e o usu
 | Vitest | 19 aprovados, 0 falhas; 2 testes genéricos ignorados sem `TEST_DATABASE_URL` local |
 | Paridade automatizada V3.11 | 147 categorias e 574 referências, zero diferenças |
 | Auditoria de dependências de produção | 0 vulnerabilidades conhecidas |
-| Migrações em PostgreSQL real | `001`, `002` e `003` aplicadas |
+| Migrações em PostgreSQL real | `001`, `002` e `003` homologadas; `004` adicionada após reconciliação pós-deploy da base antiga |
 | Importação/seed isolado | 986 códigos históricos, 147 categorias, 574 referências e 5 históricos |
 | Concorrência com dois usuários | 2 códigos únicos (`000003` e `000004`) |
 | Confirmação simultânea do mesmo item | 1 gravado e 1 bloqueado |

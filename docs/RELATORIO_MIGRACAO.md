@@ -23,6 +23,7 @@ O seed completo `seeds/v311-complete.json` foi aplicado no banco `sap_codigos_au
 1. `001_initial.sql` — estrutura, restrições e catálogos-base;
 2. `002_v311_category_parity.sql` — normalização completa das 147 categorias;
 3. `003_v311_reference_parity.sql` — paridade de referências e inativação sem exclusão.
+4. `004_v311_reference_activation_parity.sql` — completa a inativação preservadora de seis modelos versionados no domínio e 21 aliases semânticos de diâmetro em bancos antigos.
 
 A conferência direta retornou 12 naturezas, 147 categorias, 574 referências ativas, 986 códigos históricos e 5 eventos históricos. Após sete gravações funcionais de teste, os dois usuários consultaram 993 códigos. A Machine foi reiniciada e manteve os 993 registros, com 2/2 verificações de saúde aprovadas.
 
@@ -37,4 +38,4 @@ A conferência direta retornou 12 naturezas, 147 categorias, 574 referências at
 - atualiza contadores pelo maior sequencial histórico aplicável;
 - preserva códigos e históricos, sem exclusão ou recálculo.
 
-O banco de produção não foi alterado. A execução em produção exige backup verificado e autorização explícita.
+Na implantação autorizada de 14/09/2026, foi criado e confirmado o backup completo `20260914-194642F` antes das migrações. A primeira verificação pós-deploy revelou que a migração 003 não abrangia a grafia com dois-pontos nem 21 aliases semânticos existentes no banco antigo; a migração 004 foi criada para completar a paridade sem excluir registros.

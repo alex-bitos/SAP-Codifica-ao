@@ -20,7 +20,7 @@ Não crie outro aplicativo ou banco. A próxima implantação deve atualizar os 
 4. Registre as contagens atuais de `users`, `natures`, `categories`, `technical_references`, `sap_codes`, `audit_log` e `database_imports`.
 5. Confirme no painel do Managed Postgres que o backup automático recente está íntegro.
 6. Gere também um `pg_dump` lógico criptografado e teste a leitura do arquivo. Não grave conexão ou senha no histórico.
-7. Revise as migrações `002_v311_category_parity.sql` e `003_v311_reference_parity.sql`. A migração 003 apenas inativa aliases obsoletos; não exclui registros.
+7. Revise as migrações `002_v311_category_parity.sql`, `003_v311_reference_parity.sql` e `004_v311_reference_activation_parity.sql`. As migrações de referência apenas inativam aliases obsoletos; não excluem registros.
 
 ## Implantação aprovada
 
