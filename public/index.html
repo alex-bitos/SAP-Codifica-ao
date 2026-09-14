@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Gerador e Controle de Códigos SAP</title>
+  <meta name="description" content="Geração e consulta multiusuário de códigos SAP com base PostgreSQL centralizada.">
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div id="loginView" class="login-shell">
+    <section class="login-card" aria-labelledby="loginTitle">
+      <div class="brand-mark">CS</div>
+      <p class="eyebrow">Clark Solutions</p>
+      <h1 id="loginTitle">Códigos SAP</h1>
+      <p class="muted">Acesse o cadastro centralizado e compartilhado.</p>
+      <form id="loginForm" class="stack">
+        <label>Login ou e-mail<input name="login" autocomplete="username" required></label>
+        <label>Senha<span class="password-field"><input id="loginPassword" name="password" type="password" autocomplete="current-password" required><button id="togglePassword" type="button" class="icon-button" aria-label="Mostrar senha">Mostrar</button></span></label>
+        <button type="submit">Entrar</button>
+        <p id="loginMessage" class="message" role="alert"></p>
+      </form>
+    </section>
+  </div>
+
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark small-mark">CS</span><span><strong>Códigos SAP</strong><small>Controle central</small></span></div>
+      <nav id="navigation" aria-label="Navegação principal">
+        <button data-view="generate" class="active">Novo código</button>
+        <button data-view="codes">Consultar códigos</button>
+        <button data-view="batch" data-role="write">Codificação em lote</button>
+        <button data-view="catalogs" data-role="admin">Cadastros técnicos</button>
+        <button data-view="users" data-role="admin">Usuários</button>
+        <button data-view="database" data-role="admin">Importação e auditoria</button>
+      </nav>
+      <div class="sidebar-foot"><span id="connection" class="connection"><i></i> Verificando servidor</span><button id="logoutButton" class="ghost">Sair</button></div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar"><button id="menuButton" class="menu-button" aria-label="Abrir menu">☰</button><div><p class="eyebrow">Gerador e Controle</p><h1 id="viewTitle">Novo código</h1></div><div class="user-chip"><span id="userInitials">--</span><div><strong id="userName"></strong><small id="userRole"></small></div></div></header>
+      <main>
+        <section id="view-generate" class="view active">
+          <div class="section-heading"><div><h2>Gerar código SAP</h2><p>O código definitivo é reservado somente na confirmação.</p></div><span class="pill">6 dígitos · sem DV</span></div>
+          <form id="generateForm" class="panel">
+            <div class="form-grid"><label>Natureza<select id="natureSelect" required></select></label><label>Categoria<select id="categorySelect" required></select></label></div>
+            <div id="dynamicFields" class="form-grid dynamic-fields"></div>
+            <details><summary>Dados administrativos</summary><div class="form-grid detail-grid"><label>Unidade<input name="unit"></label><label>Fabricante<input name="manufacturer"></label><label>Modelo<input name="model"></label><label>TAG<input name="tag"></label><label>NCP<input name="ncp"></label><label>Projeto<input name="project"></label><label>Número de série<input name="serialNumber"></label><label class="wide">Observação<textarea name="notes"></textarea></label></div></details>
+            <div class="actions"><button id="previewButton" type="button" class="secondary">Calcular e verificar</button><button id="confirmButton" type="submit" disabled>Confirmar e incluir</button></div>
+          </form>
+          <article id="previewCard" class="preview-card hidden"><div><span>Código proposto</span><strong id="previewCode"></strong></div><div><span>Descrição padronizada</span><p id="previewDescription"></p></div><small>A prévia é estimada. Em caso de concorrência, o servidor atribui o próximo código disponível.</small></article>
+          <p id="generateMessage" class="message" role="status"></p>
+        </section>
+
+        <section id="view-codes" class="view">
+          <div class="section-heading"><div><h2>Códigos cadastrados</h2><p>Resultados consultados diretamente no PostgreSQL.</p></div><button id="exportButton" data-role="write">Exportar Excel</button></div>
+          <div class="panel filters"><input id="codeSearch" placeholder="Código, descrição, TAG ou modelo"><select id="codeCategory"><option value="">Todas as categorias</option></select><select id="codeStatus"><option value="">Todas as situações</option><option>Provisório</option><option>Aprovado</option><option>Ativo</option><option>Cancelado</option><option>Inativo</option></select><button id="searchButton" class="secondary">Pesquisar</button></div>
+          <div class="table-card"><table><thead><tr><th>Código SAP</th><th>Descrição</th><th>Natureza</th><th>Categoria</th><th>TAG</th><th>Situação</th></tr></thead><tbody id="codesBody"></tbody></table><div class="pagination"><button id="prevPage" class="ghost">Anterior</button><span id="pageInfo"></span><button id="nextPage" class="ghost">Próxima</button></div></div>
+        </section>
+
+        <section id="view-batch" class="view">
+          <div class="section-heading"><div><h2>Codificação em lote</h2><p>Importe uma aba “Itens”; o lote inteiro é confirmado em uma única transação.</p></div></div>
+          <div class="panel upload-panel"><input id="batchFile" type="file" accept=".xlsx,.xls"><button id="validateBatch">Validar planilha</button><button id="confirmBatch" disabled>Confirmar lote</button><p class="muted">Colunas: Categoria, Natureza e campos técnicos. Campos administrativos são opcionais.</p></div>
+          <div id="batchSummary" class="summary-grid"></div><div class="table-card"><table><thead><tr><th>Linha</th><th>Categoria</th><th>Código estimado</th><th>Resultado</th></tr></thead><tbody id="batchBody"></tbody></table></div><p id="batchMessage" class="message"></p>
+        </section>
+
+        <section id="view-catalogs" class="view">
+          <div class="section-heading"><div><h2>Cadastros técnicos</h2><p>Categorias e referências usadas nas regras de geração.</p></div></div>
+          <div class="split"><div class="table-card"><div class="card-head"><h3>Categorias</h3><input id="catalogSearch" placeholder="Filtrar"></div><table><thead><tr><th>Natureza</th><th>Categoria</th><th>Base</th><th>Situação</th></tr></thead><tbody id="categoriesBody"></tbody></table></div><div class="table-card"><div class="card-head"><h3>Referências</h3><span id="referenceCount"></span></div><table><thead><tr><th>Grupo</th><th>Descrição</th><th>Código</th></tr></thead><tbody id="referencesBody"></tbody></table></div></div>
+        </section>
+
+        <section id="view-users" class="view">
+          <div class="section-heading"><div><h2>Usuários</h2><p>Perfis e acessos são validados também no servidor.</p></div><button id="newUserButton">Cadastrar usuário</button></div>
+          <div class="table-card"><table><thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Situação</th><th>Último acesso</th><th>Ações</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+        </section>
+
+        <section id="view-database" class="view">
+          <div class="section-heading"><div><h2>Importação e auditoria</h2><p>Valide antes de confirmar. Arquivos repetidos são bloqueados pelo hash.</p></div></div>
+          <div class="panel upload-panel"><input id="databaseFile" type="file" accept=".xlsx"><button id="validateDatabase">Simular importação</button><button id="confirmDatabase" disabled>Confirmar importação</button><div id="importReport"></div></div>
+          <div class="table-card"><div class="card-head"><h3>Auditoria recente</h3><button id="refreshAudit" class="secondary">Atualizar</button></div><table><thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Entidade</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="passwordDialog"><form id="passwordForm" method="dialog" class="dialog-card"><h2>Troca obrigatória de senha</h2><p>Defina uma senha pessoal antes de continuar.</p><label>Senha atual<input name="currentPassword" type="password" required></label><label>Nova senha<input name="newPassword" type="password" minlength="12" required></label><button type="submit">Alterar senha</button><p id="passwordMessage" class="message"></p></form></dialog>
+  <dialog id="userDialog"><form id="userForm" method="dialog" class="dialog-card"><h2>Novo usuário</h2><label>Nome<input name="name" required></label><label>Login<input name="login" required></label><label>E-mail<input name="email" type="email"></label><label>Perfil<select name="role"><option>Codificador</option><option>Consulta</option><option>Administrador</option></select></label><label>Senha temporária<input name="temporaryPassword" type="password" minlength="12" required></label><div class="actions"><button type="button" class="secondary" data-close>Cancelar</button><button type="submit">Cadastrar</button></div><p id="userMessage" class="message"></p></form></dialog>
+  <dialog id="confirmDialog"><form method="dialog" class="dialog-card"><h2>Confirmar código</h2><p id="confirmText"></p><div class="actions"><button value="cancel" class="secondary">Cancelar</button><button id="dialogConfirm" value="default">Confirmar inclusão</button></div></form></dialog>
+  <script src="/vendor/xlsx/xlsx.full.min.js"></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>
