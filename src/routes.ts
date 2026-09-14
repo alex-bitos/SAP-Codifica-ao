@@ -125,6 +125,32 @@ router.post('/codes/batch/confirm', requireRoles('Administrador', 'Codificador')
   res.status(201).json({ items: await createBatch(items, req.user!, req.ip) });
 }));
 
+router.get('/database/status', requireAuth, asyncRoute(async (_req, res) => {
+  const [counts, lastImport, lastAudit] = await Promise.all([
+    getPool().query(`SELECT
+      (SELECT count(*)::int FROM natures) AS natures,
+      (SELECT count(*)::int FROM categories) AS categories,
+      (SELECT count(*)::int FROM technical_references) AS references,
+      (SELECT count(*)::int FROM sap_codes) AS codes,
+      (SELECT count(*)::int FROM audit_log) AS audits,
+      (SELECT count(*)::int FROM sequential_counters) AS counters`),
+    getPool().query(`SELECT di.file_name AS "fileName",di.status,di.summary,di.created_at AS "createdAt",
+      di.completed_at AS "completedAt",COALESCE(u.name,'') AS "importedBy"
+      FROM database_imports di LEFT JOIN users u ON u.id=di.imported_by
+      ORDER BY di.created_at DESC LIMIT 1`),
+    getPool().query(`SELECT action,entity_type AS "entityType",actor_name AS "actorName",created_at AS "createdAt"
+      FROM audit_log ORDER BY created_at DESC LIMIT 1`),
+  ]);
+  const totals = counts.rows[0];
+  res.json({
+    connected: true,
+    initialized: totals.categories > 0 && totals.codes > 0,
+    counts: totals,
+    lastImport: lastImport.rows[0] || null,
+    lastAudit: lastAudit.rows[0] || null,
+  });
+}));
+
 router.get('/natures', requireAuth, asyncRoute(async (_req, res) => { const result = await getPool().query('SELECT id,name,code,active FROM natures ORDER BY name'); res.json({ items: result.rows }); }));
 router.get('/categories', requireAuth, asyncRoute(async (req, res) => {
   const nature = String(req.query.nature || ''); const result = await getPool().query(`SELECT c.id,c.nature_id AS "natureId",n.name AS nature,n.code AS "natureCode",c.name,c.base_code AS "baseCode",c.description_format AS "descriptionFormat",c.characteristic_1 AS "characteristic1",c.characteristic_2 AS "characteristic2",c.code_formula AS "codeFormula",c.required_fields AS "requiredFields",c.example,c.active FROM categories c JOIN natures n ON n.id=c.nature_id WHERE ($1='' OR n.id::text=$1) ORDER BY c.name,n.name`, [nature]); res.json({ items: result.rows });

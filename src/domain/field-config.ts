@@ -1,6 +1,7 @@
 import type { Category } from '../types.js';
 import { ADMINISTRATIVE_FIELDS, FLANGE_COVER_CATALOG } from './code-rules.js';
 import { fieldKey, normalizeText } from './normalization.js';
+import { characteristicForField, referenceLookupGroup, technicalFieldFamily } from './reference-resolution.js';
 
 export interface TechnicalReference {
   group: string;
@@ -71,24 +72,9 @@ export function canonicalReferenceGroup(value: string) {
   return normalized.replace(/\b(de|do|da|para)\b/g, '').replace(/fixacoes/g, 'fixacao').replace(/\s+/g, ' ').trim();
 }
 
-function family(label: string) {
-  const key = normalizeText(label);
-  if (key.includes('schedule')) return 'schedule';
-  if (key === 'norma do material') return 'norma_material';
-  if (['norma dimensional', 'norma flange', 'norma pestana', 'norma uniao'].includes(key)) return 'norma_dimensional';
-  if (key === 'diametro nominal') return 'diametro';
-  if (key === 'classe de pressao' || key === 'lbs') return 'classe';
-  if (key.includes('material')) return 'material';
-  if (key.includes('espessura')) return 'espessura';
-  if (key.includes('diametro') || key === 'tubo') return 'diametro';
-  if (key.includes('acabamento')) return 'acabamento';
-  if (key.includes('norma')) return 'norma';
-  return key.replace(/\s+/g, '_');
-}
-
-function referenceGroupFor(category: Category, label: string) {
+export function referenceGroupFor(category: Category, label: string) {
   const categoryKey = normalizeText(category.name);
-  const fieldFamily = family(label);
+  const fieldFamily = technicalFieldFamily(label);
   const special: Record<string, Record<string, string>> = {
     flange: { norma_material: 'Flange:NormaMaterial', material: 'Flange:Material', diametro: 'Flange:DiametroNominal', face: 'Flange:Face', norma_dimensional: 'Flange:NormaDimensional', classe: 'Flange:ClassePressao', tipo: 'Flange:Tipo' },
     pestana: { norma_material: 'Pestana:NormaMaterial', material: 'Pestana:Material', diametro: 'Pestana:DiametroNominal', norma_dimensional: 'Pestana:NormaDimensional' },
@@ -97,14 +83,14 @@ function referenceGroupFor(category: Category, label: string) {
     'flange cover': { modelo: 'Flange Cover:Modelo', material: 'Flange Cover:Material', diametro: 'Flange Cover:Diametro', classe: 'Flange Cover:Classe', dreno: 'Flange Cover:Dreno' },
   };
   if (special[categoryKey]?.[fieldFamily]) return special[categoryKey][fieldFamily];
-  const characteristic = [category.characteristic1, category.characteristic2].find((item) => canonicalReferenceGroup(item) === canonicalReferenceGroup(label));
-  return characteristic || `${category.name}:${label}`;
+  const characteristic = characteristicForField(category, label);
+  return characteristic ? referenceLookupGroup(category.name, characteristic) : `${category.name}:${label}`;
 }
 
 function staticOptions(category: Category, label: string) {
   const categoryKey = normalizeText(category.name);
   const key = fieldKey(label);
-  const fieldFamily = family(label);
+  const fieldFamily = technicalFieldFamily(label);
   const options = [...(GLOBAL_OPTIONS[key] || []), ...(GLOBAL_OPTIONS[fieldFamily] || []), ...(CATEGORY_OPTIONS[categoryKey]?.[key] || []), ...(CATEGORY_OPTIONS[categoryKey]?.[fieldFamily] || [])];
   if (categoryKey === 'flange cover' && fieldFamily in FLANGE_COVER_CATALOG) options.push(...Object.keys(FLANGE_COVER_CATALOG[fieldFamily as keyof typeof FLANGE_COVER_CATALOG]));
   if (fieldFamily === 'espessura' && ['chapa', 'barra chata', 'anel'].includes(categoryKey)) options.push(...SHEET_THICKNESS);
@@ -131,18 +117,21 @@ function unique(values: string[]) {
 export function fieldDefinitions(category: Category, references: TechnicalReference[]): FieldDefinition[] {
   return category.requiredFields.map((label, position) => {
     const key = fieldKey(label);
-    const fieldFamily = family(label);
+    const fieldFamily = technicalFieldFamily(label);
     const referenceGroup = referenceGroupFor(category, label);
+    const flangeCover = normalizeText(category.name) === 'flange cover';
     const matching = references.filter((reference) => reference.active !== false && (
-      canonicalReferenceGroup(reference.group) === canonicalReferenceGroup(referenceGroup)
-      || canonicalReferenceGroup(reference.group) === canonicalReferenceGroup(label)
-      || (fieldFamily === 'material' && ['material', 'inox', 'metais', 'plasticos', 'ceramica'].some((part) => normalizeText(reference.group).includes(part)))
-      || (fieldFamily === 'diametro' && normalizeText(reference.group).includes('diametro'))
-      || (fieldFamily === 'espessura' && normalizeText(reference.group).includes('espessura'))
+      flangeCover
+        ? normalizeText(reference.group) === normalizeText(referenceGroup)
+        : canonicalReferenceGroup(reference.group) === canonicalReferenceGroup(referenceGroup)
+          || canonicalReferenceGroup(reference.group) === canonicalReferenceGroup(label)
+          || (fieldFamily === 'material' && ['material', 'inox', 'metais', 'plasticos', 'ceramica'].some((part) => normalizeText(reference.group).includes(part)))
+          || (fieldFamily === 'diametro' && normalizeText(reference.group).includes('diametro'))
+          || (fieldFamily === 'espessura' && normalizeText(reference.group).includes('espessura'))
     )).map((reference) => reference.description);
     const options = unique([...staticOptions(category, label), ...matching]);
-    const locked = normalizeText(category.name) === 'flange cover' || key === 'origem';
-    const characteristicKeys = [category.characteristic1, category.characteristic2].map(fieldKey);
+    const locked = flangeCover || key === 'origem';
+    const characteristic = characteristicForField(category, label);
     const normalizedFormat = normalizeText(category.descriptionFormat);
     return {
       key, label, required: true, position,
@@ -151,8 +140,8 @@ export function fieldDefinitions(category: Category, references: TechnicalRefere
       referenceGroup,
       participatesInDescription: normalizedFormat.includes(normalizeText(label)),
       participatesInTechnicalKey: !ADMINISTRATIVE_FIELDS.has(key),
-      participatesInCode: normalizeText(category.name) === 'flange cover' || characteristicKeys.includes(key),
-      validation: key === 'origem' ? 'N ou I' : locked ? 'Valor do catálogo oficial' : '',
+      participatesInCode: flangeCover || Boolean(characteristic),
+      validation: key === 'origem' ? 'N ou I' : locked ? 'Valor do catálogo oficial' : characteristic ? `Código de 2 caracteres · grupo ${referenceGroup}` : '',
     };
   });
 }

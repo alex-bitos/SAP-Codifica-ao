@@ -4,9 +4,10 @@ import { getPool, transaction } from '../db.js';
 import type { AuthUser, Category, CodeInput } from '../types.js';
 import { buildDescription, buildFlangeCover, composeSequentialCode, isFlangeCover, missingFields, normalizedTechnicalDescription, normalizeInput, structuralPrefix, technicalKey, validateCompatibility, valueForCharacteristic } from '../domain/code-rules.js';
 import { canonicalGroup, normalizeText } from '../domain/normalization.js';
+import { referenceDescriptionMatches, referenceLookupGroup } from '../domain/reference-resolution.js';
+import { ApplicationError, ConflictError, ValidationError } from '../errors.js';
 
-export class ConflictError extends Error { status = 409; }
-export class ValidationError extends Error { status = 400; }
+export { ConflictError, ValidationError } from '../errors.js';
 
 function mapCategory(row: any): Category {
   return {
@@ -25,14 +26,19 @@ async function categoryById(client: PoolClient, id: string): Promise<Category> {
   return mapCategory(result.rows[0]);
 }
 
-async function referenceCode(client: PoolClient, group: string, value: string): Promise<string> {
+export function findReferenceCode(rows: { reference_group: string; description: string; code: string }[], group: string, value: string): string {
   if (!group) return '';
   if (normalizeText(value) === 'na') return 'NA';
+  const target = canonicalGroup(group);
+  const match = rows.find((row) => canonicalGroup(row.reference_group) === target && referenceDescriptionMatches(row.description, value));
+  return match?.code || '';
+}
+
+async function referenceCode(client: PoolClient, categoryName: string, characteristic: string, value: string): Promise<string> {
+  const group = referenceLookupGroup(categoryName, characteristic);
   const rows = await client.query(`SELECT reference_group, description, code FROM technical_references
     WHERE active=true AND code<>''`);
-  const target = canonicalGroup(group);
-  const match = rows.rows.find((row) => canonicalGroup(row.reference_group) === target && normalizeText(row.description) === normalizeText(value));
-  return match?.code || '';
+  return findReferenceCode(rows.rows, group, value);
 }
 
 async function flangeOverrides(client: PoolClient) {
@@ -67,10 +73,12 @@ async function prepare(client: PoolClient, inputValue: CodeInput) {
   }
   const v1 = valueForCharacteristic(category.characteristic1, input.attributes);
   const v2 = valueForCharacteristic(category.characteristic2, input.attributes);
-  const c1 = category.characteristic1 ? await referenceCode(client, category.characteristic1, v1) : '';
-  const c2 = category.characteristic2 ? await referenceCode(client, category.characteristic2, v2) : '';
-  if (category.characteristic1 && !c1) throw new ValidationError(`Referência não cadastrada para ${category.characteristic1}: ${v1}.`);
-  if (category.characteristic2 && !c2) throw new ValidationError(`Referência não cadastrada para ${category.characteristic2}: ${v2}.`);
+  const group1 = referenceLookupGroup(category.name, category.characteristic1);
+  const group2 = referenceLookupGroup(category.name, category.characteristic2);
+  const c1 = category.characteristic1 ? await referenceCode(client, category.name, category.characteristic1, v1) : '';
+  const c2 = category.characteristic2 ? await referenceCode(client, category.name, category.characteristic2, v2) : '';
+  if (category.characteristic1 && !c1) throw new ApplicationError(`Não foi possível gerar ${category.name}. Referência técnica ausente no grupo “${group1}” para “${v1}”. Nenhum código foi gravado. Solicite a um Administrador que cadastre a referência com seu código técnico.`, { status: 422, code: 'REFERENCE_MISSING', details: { stage: 'resolução da característica 1', category: category.name, field: category.characteristic1, group: group1, description: v1, rolledBack: true, dataWritten: false } });
+  if (category.characteristic2 && !c2) throw new ApplicationError(`Não foi possível gerar ${category.name}. Referência técnica ausente no grupo “${group2}” para “${v2}”. Nenhum código foi gravado. Solicite a um Administrador que cadastre a referência com seu código técnico.`, { status: 422, code: 'REFERENCE_MISSING', details: { stage: 'resolução da característica 2', category: category.name, field: category.characteristic2, group: group2, description: v2, rolledBack: true, dataWritten: false } });
   const prefix = structuralPrefix(category, c1, c2);
   return { input, category, description, key, c1, c2, v1, v2, special: false, code: '', prefix };
 }
@@ -122,26 +130,31 @@ async function generateInTransaction(client: PoolClient, input: CodeInput, user:
 
 function isRetryable(error: any) { return ['40001', '40P01'].includes(error?.code); }
 function isUniqueConflict(error: any) { return error?.code === '23505'; }
+const MAX_TRANSACTION_ATTEMPTS = 20;
+async function retryBackoff(attempt: number) {
+  const delay = Math.min(15 * (2 ** (attempt - 1)), 300) + Math.floor(Math.random() * 25);
+  await new Promise((resolve) => setTimeout(resolve, delay));
+}
 
 export async function createCode(input: CodeInput, user: AuthUser, ip?: string) {
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt += 1) {
     try {
       return await transaction(async (client) => {
         await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
         return generateInTransaction(client, input, user, ip);
       });
     } catch (error) {
-      if (isRetryable(error) && attempt < 3) continue;
+      if (isRetryable(error) && attempt < MAX_TRANSACTION_ATTEMPTS) { await retryBackoff(attempt); continue; }
       if (isUniqueConflict(error)) throw new ConflictError('Outro usuário confirmou este código primeiro. Atualize a consulta e tente novamente.');
       throw error;
     }
   }
-  throw new ConflictError('Não foi possível reservar o sequencial após três tentativas.');
+  throw new ConflictError(`Não foi possível reservar o sequencial após ${MAX_TRANSACTION_ATTEMPTS} tentativas.`);
 }
 
 export async function createBatch(inputs: CodeInput[], user: AuthUser, ip?: string) {
   if (!inputs.length || inputs.length > 500) throw new ValidationError('O lote deve conter de 1 a 500 itens.');
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt += 1) {
     try {
       return await transaction(async (client) => {
         await client.query('SET TRANSACTION ISOLATION LEVEL SERIALIZABLE');
@@ -151,10 +164,10 @@ export async function createBatch(inputs: CodeInput[], user: AuthUser, ip?: stri
         return results;
       });
     } catch (error) {
-      if (isRetryable(error) && attempt < 3) continue;
+      if (isRetryable(error) && attempt < MAX_TRANSACTION_ATTEMPTS) { await retryBackoff(attempt); continue; }
       if (isUniqueConflict(error)) throw new ConflictError('Conflito com código ou item já confirmado por outro usuário. Nenhum item do lote foi gravado.');
       throw error;
     }
   }
-  throw new ConflictError('Não foi possível confirmar o lote após três tentativas.');
+  throw new ConflictError(`Não foi possível confirmar o lote após ${MAX_TRANSACTION_ATTEMPTS} tentativas.`);
 }

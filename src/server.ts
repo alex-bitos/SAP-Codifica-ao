@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import compression from 'compression';
@@ -35,9 +36,18 @@ export function createApp() {
   app.use(express.static(publicDir, { index: 'index.html', maxAge: config.NODE_ENV === 'production' ? '1h' : 0 }));
   app.get('*path', (_req, res) => res.sendFile(path.join(publicDir, 'index.html')));
   app.use((error: any, req: Request, res: Response, _next: NextFunction) => {
-    const status = error?.status || (error instanceof ZodError ? 400 : error?.code === '23505' ? 409 : 500);
-    if (status >= 500) console.error('Erro interno:', error?.message);
-    res.status(status).json({ error: status >= 500 ? 'Erro interno do servidor.' : error.message, issues: error instanceof ZodError ? error.issues : undefined });
+    const databaseConflict = error?.code === '23505';
+    const status = error?.status || (error instanceof ZodError ? 400 : databaseConflict ? 409 : 500);
+    const errorId = crypto.randomUUID();
+    const cause = error?.cause instanceof Error ? { name: error.cause.name, message: error.cause.message, stack: error.cause.stack } : undefined;
+    console.error('Falha na requisição:', JSON.stringify({ errorId, status, method: req.method, path: req.originalUrl, name: error?.name, code: error?.code, message: error?.message, details: error?.details, stack: error?.stack, cause }));
+    res.status(status).json({
+      error: status >= 500 ? `Não foi possível concluir a operação. Nenhum dado parcial foi mantido. Informe o identificador ${errorId} ao suporte.` : databaseConflict ? 'Já existe um registro com estes dados.' : error.message,
+      code: status < 500 ? (databaseConflict ? 'DUPLICATE_RECORD' : error?.code) : 'INTERNAL_ERROR',
+      details: status < 500 ? error?.details : undefined,
+      issues: error instanceof ZodError ? error.issues : undefined,
+      errorId,
+    });
   });
   return app;
 }

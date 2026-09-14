@@ -5,6 +5,7 @@ import { buildDescription, technicalKey } from '../../src/domain/code-rules.js';
 import { searchCategories } from '../../src/domain/category-search.js';
 import { canonicalReferenceGroup, fieldDefinitions } from '../../src/domain/field-config.js';
 import { canonicalCode, fieldKey, normalizeText } from '../../src/domain/normalization.js';
+import { characteristicSourceField } from '../../src/domain/reference-resolution.js';
 import type { Category } from '../../src/types.js';
 
 const root = process.cwd();
@@ -61,6 +62,24 @@ describe('paridade integral automatizada com a V3.11', () => {
     expect(find('Produto Intermediário', 'Tubo')).toMatchObject({ baseCode: 'PITU', requiredFields: ['norma', 'material', 'diametro', 'schedule ou espessura', 'origem'] });
     expect(find('Matéria Prima', 'Flange').requiredFields.map(fieldKey)).toEqual(['tipo', 'norma_do_material', 'material', 'diametro_nominal', 'face', 'norma_dimensional', 'classe_de_pressao', 'origem']);
     expect(find('Produto Intermediário', 'Instrumento').requiredFields.map(fieldKey)).toEqual(['tipo', 'variavel', 'faixa', 'conexao', 'sinal', 'fabricante', 'modelo', 'origem']);
+  });
+
+  it('resolve no catálogo oficial todas as características codificadoras de Produto Acabado', () => {
+    const codedReferenceGroups = new Set(references.filter((reference: { code?: string }) => reference.code)
+      .map((reference: { group: string }) => canonicalReferenceGroup(reference.group)));
+    const finishedProducts = categories.filter((category: Category) => category.nature === 'Produto Acabado' && normalizeText(category.name) !== 'flange cover');
+
+    for (const category of finishedProducts) {
+      const definitions = fieldDefinitions(category, references);
+      for (const characteristic of [category.characteristic1, category.characteristic2].filter(Boolean)) {
+        const sourceKey = characteristicSourceField(category, characteristic);
+        const definition = definitions.find((field) => field.key === sourceKey);
+        expect(sourceKey, `${category.name}/${characteristic}`).not.toBe('');
+        expect(definition, `${category.name}/${characteristic}`).toBeDefined();
+        expect(definition?.participatesInCode, `${category.name}/${characteristic}`).toBe(true);
+        expect(codedReferenceGroups.has(canonicalReferenceGroup(definition?.referenceGroup || '')), `${category.name}/${characteristic}/${definition?.referenceGroup}`).toBe(true);
+      }
+    }
   });
 
   it('mantém todas as referências efetivas semanticamente únicas', () => {

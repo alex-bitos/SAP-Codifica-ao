@@ -19,9 +19,10 @@
     "audit:v311": "npm run build && node scripts/generate-v311-assets.mjs",
     "verify:homologation": "tsx src/cli/verify-homologation.ts",
     "test:visual": "node scripts/visual-audit.mjs",
+    "test:visual:finished-products": "node scripts/finished-products-visual-audit.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run test/integration"
+    "test:integration": "vitest run test/integration --no-file-parallelism"
   },
   "dependencies": {
     "argon2": "^0.44.0",

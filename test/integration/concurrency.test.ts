@@ -34,4 +34,28 @@ suite('concorrência PostgreSQL real', () => {
     const input={categoryId,attributes:{tipo:'Mesmo item'}}; const settled=await Promise.allSettled([createCode(input,admin),createCode(input,admin)]);
     expect(settled.filter((x)=>x.status==='fulfilled')).toHaveLength(1); expect(settled.filter((x)=>x.status==='rejected')).toHaveLength(1);
   });
+
+  it('rejeita referência ausente sem persistir código, contador ou auditoria', async () => {
+    const pool = (await import('../../src/db.js')).getPool();
+    const nature = await pool.query("SELECT id FROM natures WHERE code='PA'");
+    const category = await pool.query(`INSERT INTO categories(
+      nature_id,name,base_code,description_format,characteristic_1,code_formula,required_fields
+    ) VALUES ($1,'Produto sem Referência','PATX','Produto <tipo>','Tipo','Código Base + Tipo + Sequencial','["tipo"]') RETURNING id`, [nature.rows[0].id]);
+    const before = await pool.query(`SELECT
+      (SELECT count(*)::int FROM sap_codes) AS codes,
+      (SELECT count(*)::int FROM sequential_counters) AS counters,
+      (SELECT count(*)::int FROM audit_log) AS audits`);
+
+    await expect(createCode({ categoryId: category.rows[0].id, attributes: { tipo: 'Inexistente' } }, admin)).rejects.toMatchObject({
+      status: 422,
+      code: 'REFERENCE_MISSING',
+      details: { group: 'Tipo', description: 'Inexistente', rolledBack: true, dataWritten: false },
+    });
+
+    const after = await pool.query(`SELECT
+      (SELECT count(*)::int FROM sap_codes) AS codes,
+      (SELECT count(*)::int FROM sequential_counters) AS counters,
+      (SELECT count(*)::int FROM audit_log) AS audits`);
+    expect(after.rows[0]).toEqual(before.rows[0]);
+  });
 });

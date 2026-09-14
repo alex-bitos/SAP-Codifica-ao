@@ -20,6 +20,14 @@ describe('simulação da migração Excel consolidada', () => {
     expect(analyzeWorkbook(original, 'a.xlsx').fileHash).not.toBe(analyzeWorkbook(changed, 'a.xlsx').fileHash);
   });
 
+  it('explica falhas estruturais sem gravar dados', () => {
+    expect(() => analyzeWorkbook(Buffer.from('arquivo inválido'), 'invalido.xlsx')).toThrow(expect.objectContaining({
+      status: 422,
+      code: 'IMPORT_VALIDATION_FAILED',
+      details: expect.objectContaining({ stage: 'leitura e validação do Excel', dataWritten: false }),
+    }));
+  });
+
   it('mantém somente sequenciais operacionais de seis dígitos', () => {
     expect(importedSequential('00000', 'PIIN0000000000')).toBe('');
     expect(importedSequential('123456', 'PIIN0012123456')).toBe('123456');

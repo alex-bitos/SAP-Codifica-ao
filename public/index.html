@@ -43,6 +43,7 @@
         <section id="view-generate" class="view active">
           <div class="section-heading"><div><h2>Gerar código SAP</h2><p>O código definitivo é reservado somente na confirmação.</p></div><span class="pill">6 dígitos · sem DV</span></div>
           <form id="generateForm" class="panel">
+            <div id="databaseEmptyWarning" class="catalog-error hidden" role="alert">O banco central ainda não foi inicializado. Solicite que um Administrador realize a importação inicial.</div>
             <div id="catalogError" class="catalog-error hidden" role="alert">Não foi possível carregar as naturezas e categorias do banco central. O gerador ficará indisponível até a conexão ser restabelecida.</div>
             <section class="category-finder" aria-labelledby="categoryFinderTitle">
               <label id="categoryFinderTitle" for="categoryFinderText">Busca rápida de categoria</label>
@@ -82,6 +83,7 @@
 
         <section id="view-database" class="view">
           <div class="section-heading"><div><h2>Importação e auditoria</h2><p>Valide antes de confirmar. Arquivos repetidos são bloqueados pelo hash.</p></div></div>
+          <div id="databaseStatus" class="summary-grid" aria-live="polite"></div>
           <div class="panel upload-panel"><input id="databaseFile" type="file" accept=".xlsx"><button id="validateDatabase">Simular importação</button><button id="confirmDatabase" disabled>Confirmar importação</button><div id="importReport"></div></div>
           <div class="table-card"><div class="card-head"><h3>Auditoria recente</h3><button id="refreshAudit" class="secondary">Atualizar</button></div><table><thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Entidade</th><th>Detalhes</th></tr></thead><tbody id="auditBody"></tbody></table></div>
         </section>

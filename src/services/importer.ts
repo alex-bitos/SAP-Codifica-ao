@@ -6,6 +6,7 @@ import { canonicalCode, normalizeText } from '../domain/normalization.js';
 import { v311CategoryRows } from '../domain/v311-category-rules.js';
 import { v311ReferenceIdentityGroup, v311ReferenceRows } from '../domain/v311-reference-rules.js';
 import { getPool, transaction } from '../db.js';
+import { ApplicationError, ConflictError, ValidationError } from '../errors.js';
 import type { AuthUser } from '../types.js';
 
 const REQUIRED_HEADERS = {
@@ -56,7 +57,18 @@ function duplicates(values: { key: string; row: number }[]) {
 }
 
 export function analyzeWorkbook(buffer: Buffer, fileName: string): ImportAnalysis & { rows: WorkbookRows } {
-  const rows = parse(buffer);
+  let rows: WorkbookRows;
+  try {
+    rows = parse(buffer);
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : 'estrutura inválida';
+    throw new ValidationError(`Não foi possível validar “${fileName}”: ${reason} Nenhum dado foi gravado.`, {
+      status: 422,
+      code: 'IMPORT_VALIDATION_FAILED',
+      details: { stage: 'leitura e validação do Excel', fileName, rolledBack: false, dataWritten: false },
+      cause,
+    });
+  }
   const canonicalDuplicates = duplicates(rows.Codigos.map((row, index) => ({ key: canonicalCode(row.CodigoSAP), row: index + 2 })))
     .map(([value, lineRows]) => ({ canonicalCode: value, rows: lineRows }));
   const technicalDuplicates = duplicates(rows.Codigos.map((row, index) => ({
@@ -139,11 +151,19 @@ async function natureId(client: PoolClient, name: string, code = '') {
 
 export async function importWorkbook(buffer: Buffer, fileName: string, expectedHash: string, user: AuthUser, ip?: string) {
   const analysis = analyzeWorkbook(buffer, fileName);
-  if (analysis.fileHash !== expectedHash) throw new Error('O arquivo enviado não corresponde à simulação aprovada.');
-  if (!analysis.valid) throw new Error('A importação contém conflitos críticos e foi cancelada.');
-  return transaction(async (client) => {
+  if (analysis.fileHash !== expectedHash) throw new ConflictError('O arquivo enviado não corresponde à simulação aprovada. Nenhum dado foi gravado.', {
+    code: 'IMPORT_HASH_MISMATCH', details: { stage: 'verificação do hash', fileName, rolledBack: false, dataWritten: false },
+  });
+  if (!analysis.valid) throw new ValidationError('A importação contém conflitos críticos e foi cancelada. Nenhum dado foi gravado.', {
+    status: 422, code: 'IMPORT_CONFLICTS', details: { stage: 'validação anterior à transação', fileName, rolledBack: false, dataWritten: false },
+  });
+  try {
+    return await transaction(async (client) => {
     const previous = await client.query('SELECT id, status FROM database_imports WHERE file_hash=$1', [analysis.fileHash]);
-    if (previous.rows[0]) throw new Error('Este arquivo já foi importado; operação idempotente bloqueada.');
+    if (previous.rows[0]) throw new ConflictError('Este arquivo já foi importado. A reimportação foi bloqueada e o banco existente foi preservado.', {
+      code: 'IMPORT_ALREADY_COMPLETED',
+      details: { stage: 'verificação de idempotência', fileName, previousStatus: previous.rows[0].status, rolledBack: true, dataWritten: false },
+    });
     const importRow = await client.query(`INSERT INTO database_imports(file_name,file_hash,status,summary,imported_by)
       VALUES ($1,$2,'PROCESSING',$3,$4) RETURNING id`, [fileName, analysis.fileHash, JSON.stringify(analysis.counts), user.id]);
 
@@ -211,8 +231,17 @@ export async function importWorkbook(buffer: Buffer, fileName: string, expectedH
         JSON.stringify({ value: value(row, 'ValorAnterior') }), JSON.stringify({ value: value(row, 'ValorNovo') }),
         JSON.stringify({ observation: value(row, 'Observacao') }), value(row, 'DataHora') || new Date().toISOString()]);
     }
-    await client.query(`UPDATE database_imports SET status='COMPLETED',completed_at=now(),summary=$2 WHERE id=$1`, [importRow.rows[0].id, JSON.stringify({ ...analysis.counts, insertedCodes, warnings: analysis.warnings })]);
+    await client.query(`UPDATE database_imports SET status='COMPLETED',completed_at=now(),summary=$2 WHERE id=$1`, [importRow.rows[0].id, JSON.stringify({ ...analysis.counts, insertedCodes, rejected: 0, auditResult: analysis.warnings.length ? 'APROVADO_COM_AVISOS' : 'APROVADO', warnings: analysis.warnings })]);
     await audit(client, 'DATABASE_IMPORTED', 'database_import', importRow.rows[0].id, user, { details: analysis.counts, ip });
     return { importId: importRow.rows[0].id, ...analysis.counts, insertedCodes, warnings: analysis.warnings };
-  });
+    });
+  } catch (cause) {
+    if (cause instanceof ApplicationError) throw cause;
+    throw new ApplicationError('A importação falhou durante a gravação no PostgreSQL. Foi realizado rollback integral e nenhum dado desta tentativa foi gravado.', {
+      status: 500,
+      code: 'IMPORT_TRANSACTION_FAILED',
+      details: { stage: 'gravação transacional no PostgreSQL', fileName, rolledBack: true, dataWritten: false },
+      cause,
+    });
+  }
 }
