@@ -7,6 +7,10 @@ primary_region = "gru"
 [env]
   NODE_ENV = "production"
   PORT = "3000"
+  ALLOWED_ORIGINS = "https://sap-codigos-multiusuario.fly.dev"
+  SESSION_TTL_HOURS = "8"
+  LOGIN_MAX_ATTEMPTS = "5"
+  LOGIN_LOCK_MINUTES = "15"
 
 [deploy]
   release_command = "node dist/cli/migrate.js"
