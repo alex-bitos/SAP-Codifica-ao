@@ -73,6 +73,12 @@ export function analyzeWorkbook(buffer: Buffer, fileName: string): ImportAnalysi
 const value = (row: Record<string, unknown>, key: string) => String(row[key] ?? '').trim();
 const active = (raw: string) => normalizeText(raw) !== 'inativo';
 
+export function importedSequential(rawValue: unknown, canonical: string) {
+  const raw = String(rawValue ?? '').trim();
+  if (raw) return /^\d{6}$/.test(raw) ? raw : '';
+  return canonical.length === 14 && /^\d{6}$/.test(canonical.slice(8)) ? canonical.slice(8) : '';
+}
+
 function officialCategory(row: Record<string, unknown>) {
   const copy = { ...row };
   const category = normalizeText(value(copy, 'Categoria'));
@@ -164,14 +170,14 @@ export async function importWorkbook(buffer: Buffer, fileName: string, expectedH
         categoryId = category.rows[0]?.id;
       }
       if (!categoryId) throw new Error(`Categoria não localizada para o código ${exactCode}: ${natureName} / ${categoryName}.`);
-      const inferredSequential = canonical.length === 14 && /^\d{6}$/.test(canonical.slice(8)) ? canonical.slice(8) : '';
+      const storedSequential = importedSequential(row.Sequencial, canonical);
       await client.query(`INSERT INTO sap_codes(sap_code,canonical_code,standardized_description,nature_id,nature_code,category_id,category_code,
         characteristic_1,characteristic_1_code,characteristic_2,characteristic_2_code,sequential,verification_digit,sequential_rule,
         technical_key,origin,unit,manufacturer,model,tag,ncp,project,serial_number,notes,status,source,created_at,technical_attributes)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'',$13,NULL,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,'Excel histórico',$24,'{}')`, [
         exactCode, canonical, value(row, 'DescricaoPadronizada'), nature.id, value(row, 'CodigoNatureza') || nature.code,
         categoryId, value(row, 'CodigoCategoria'), value(row, 'Caracteristica1'), value(row, 'CodigoCaracteristica1'),
-        value(row, 'Caracteristica2'), value(row, 'CodigoCaracteristica2'), value(row, 'Sequencial') || inferredSequential,
+        value(row, 'Caracteristica2'), value(row, 'CodigoCaracteristica2'), storedSequential,
         value(row, 'RegraSequencial'), value(row, 'Origem'), value(row, 'Unidade'), value(row, 'Fabricante'), value(row, 'Modelo'),
         value(row, 'TAG'), value(row, 'NCPProjeto'), value(row, 'Projeto'), value(row, 'NumeroSerie'), value(row, 'Observacao'),
         value(row, 'Situacao') || 'Ativo', value(row, 'DataCriacao') || new Date().toISOString(),

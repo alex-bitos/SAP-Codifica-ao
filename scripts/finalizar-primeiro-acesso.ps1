@@ -130,7 +130,13 @@ try {
   }
 
   if ($secretWasConfigured) {
-    & flyctl ssh console --app $App --command "rm -f $temporaryRemoteFile" 2>$null
+    $previousErrorPreference = $ErrorActionPreference
+    try {
+      $ErrorActionPreference = 'Continue'
+      & flyctl ssh console --app $App --command "rm -f $temporaryRemoteFile" 2>$null
+    } finally {
+      $ErrorActionPreference = $previousErrorPreference
+    }
     Write-Host 'Removendo todos os segredos temporarios...'
     & flyctl secrets unset @secretNames --app $App
     Assert-FlySucceeded 'A remocao dos segredos temporarios'
