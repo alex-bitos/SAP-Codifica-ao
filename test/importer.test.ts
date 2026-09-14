@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { analyzeWorkbook, importedSequential } from '../src/services/importer.js';
+import { analyzeWorkbook, categoryRowsForImport, importedSequential } from '../src/services/importer.js';
 
 const workbookPath = path.resolve('Banco_de_Dados_Codigos_SAP_rev3_Consolidado_Flange_Cover.xlsx');
 
@@ -24,5 +24,17 @@ describe('simulação da migração Excel consolidada', () => {
     expect(importedSequential('00000', 'PIIN0000000000')).toBe('');
     expect(importedSequential('123456', 'PIIN0012123456')).toBe('123456');
     expect(importedSequential('', 'PIIN0012654321')).toBe('654321');
+  });
+
+  it('adiciona as categorias necessárias para regras atuais e vínculos históricos', () => {
+    const analysis = analyzeWorkbook(fs.readFileSync(workbookPath), path.basename(workbookPath));
+    const categories = categoryRowsForImport(analysis.rows.Categorias);
+    expect(categories).toHaveLength(147);
+    expect(categories).toContainEqual(expect.objectContaining({
+      Natureza: 'Produto Intermediário', Categoria: 'Tubo', CodigoBase: 'PITU',
+    }));
+    expect(categories).toContainEqual(expect.objectContaining({
+      Natureza: 'Produto Intermediário', Categoria: 'Recheio Randomico', CodigoBase: 'PIRR', Situacao: 'Inativo',
+    }));
   });
 });

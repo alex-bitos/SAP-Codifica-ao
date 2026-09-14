@@ -111,6 +111,23 @@ function officialCategory(row: Record<string, unknown>) {
   return copy;
 }
 
+export function categoryRowsForImport(rows: Record<string, unknown>[]) {
+  const categoryRows = rows.map(officialCategory);
+  const hasCategory = (nature: string, category: string) => categoryRows.some((row) =>
+    normalizeText(value(row, 'Natureza')) === nature && normalizeText(value(row, 'Categoria')) === category);
+  const tubeMp = categoryRows.find((row) =>
+    normalizeText(value(row, 'Categoria')) === 'tubo' && normalizeText(value(row, 'Natureza')) === 'materia prima');
+  if (tubeMp && !hasCategory('produto intermediario', 'tubo')) {
+    categoryRows.push({ ...tubeMp, Natureza: 'Produto Intermediário', CodigoBase: 'PITU' });
+  }
+  const randomPacking = categoryRows.find((row) =>
+    normalizeText(value(row, 'Categoria')) === 'recheio randomico' && normalizeText(value(row, 'Natureza')) === 'materia prima');
+  if (randomPacking && !hasCategory('produto intermediario', 'recheio randomico')) {
+    categoryRows.push({ ...randomPacking, Natureza: 'Produto Intermediário', CodigoBase: 'PIRR', Situacao: 'Inativo' });
+  }
+  return categoryRows;
+}
+
 async function natureId(client: PoolClient, name: string, code = '') {
   const found = await client.query('SELECT id, code FROM natures WHERE lower(name)=lower($1) OR code=$2 LIMIT 1', [name, code]);
   if (found.rows[0]) return found.rows[0];
@@ -129,11 +146,7 @@ export async function importWorkbook(buffer: Buffer, fileName: string, expectedH
       VALUES ($1,$2,'PROCESSING',$3,$4) RETURNING id`, [fileName, analysis.fileHash, JSON.stringify(analysis.counts), user.id]);
 
     const categoryIds = new Map<string, string>();
-    const categoryRows = analysis.rows.Categorias.map(officialCategory);
-    const tubeMp = categoryRows.find((row) => normalizeText(value(row, 'Categoria')) === 'tubo' && normalizeText(value(row, 'Natureza')) === 'materia prima');
-    if (tubeMp && !categoryRows.some((row) => normalizeText(value(row, 'Categoria')) === 'tubo' && normalizeText(value(row, 'Natureza')) === 'produto intermediario')) {
-      categoryRows.push({ ...tubeMp, Natureza: 'Produto Intermediário', CodigoBase: 'PITU' });
-    }
+    const categoryRows = categoryRowsForImport(analysis.rows.Categorias);
     for (const row of categoryRows) {
       const nature = await natureId(client, value(row, 'Natureza'), value(row, 'CodigoBase').slice(0, 2).toUpperCase());
       const fields = value(row, 'CamposObrigatorios').split(';').map((item) => item.trim()).filter(Boolean);
