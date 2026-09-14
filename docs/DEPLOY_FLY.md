@@ -31,6 +31,8 @@ A estimativa deve ser conferida no painel no momento da compra. Em setembro de 2
 11. Valide o Excel na interface e confirme a importação somente após revisar as contagens e conflitos.
 12. Escale para duas Machines e execute os testes de concorrência com o mesmo banco. Reinicie e implante novamente; confirme que a contagem e os códigos permanecem.
 
+No Windows, execute `scripts/finalizar-primeiro-acesso.ps1` para concluir o primeiro acesso. O script solicita login, nome e senha no próprio PowerShell. A senha é digitada de forma oculta e enviada pela entrada padrão; o script cria o administrador, importa a planilha e remove o arquivo remoto e todos os segredos temporários ao terminar.
+
 O comando atual para Managed Postgres é `fly mpg`, não `fly postgres`; o último administra clusters não gerenciados. A ligação MPG injeta a URL com pool do PgBouncer. Referências oficiais: `https://fly.io/docs/flyctl/mpg/` e `https://fly.io/docs/flyctl/mpg-attach/`.
 
 ## Checklist de segurança
