@@ -1,6 +1,6 @@
 # Migração econômica SAP — produção e parada antes da exclusão
 
-Estado em 15/09/2026: corte realizado, comparação integral e regressão aprovadas. **Nenhum recurso antigo excluído. Aceite administrativo final ainda pendente**: observação de 72 horas, autorização de exclusão e conferência autenticada de faturamento.
+Estado em 15/09/2026: corte realizado, comparação integral e regressão aprovadas; autorização explícita de exclusão recebida. **Nenhum recurso antigo excluído. Aceite administrativo final ainda pendente**: observação de 72 horas, revalidação dos alvos, exclusão e conferência autenticada de faturamento.
 
 Nova URL: https://sap-codigos-economico.fly.dev. O endereço antigo redireciona páginas para ela; exige novo login por mudança de domínio. Excel permanece ferramenta administrativa de carga/auditoria/atualização controlada, não requisito a cada acesso.
 
@@ -76,6 +76,8 @@ Janela conservadora arredondada após as verificações finais: 15/09/2026 12:00
 Antes de qualquer exclusão, repetir inventário/checks/dependências, guardar backup final novo e antigo em pastas distintas, apresentar IDs atualizados e confirmar autorização. Esta é a parada administrativa exigida pelo MD; nenhum comando de destruição foi implementado ou executado.
 
 > Autoriza a exclusão permanente dos recursos antigos listados acima?
+
+Resposta explícita do responsável: “autorizo”, recebida nesta conversa e registrada em 15/09/2026 às 14:56:31 UTC (11:56:31 Brasília). A autorização cobre exclusivamente os recursos antigos apresentados acima e seus backups gerenciados inventariados, não a infraestrutura nova nem a referência de soldagem. Não houve dispensa expressa das 72 horas: exclusão permanece bloqueada até pelo menos 18/09/2026 às 12:00 Brasília. Nenhuma exclusão foi executada ou agendada; será necessário retomar a execução após a janela, repetir backups e verificações e apresentar qualquer mudança de escopo para nova aprovação.
 
 Uma aprovação não dispensa as 72 horas; essa dispensa exigiria declaração expressa separada. Resposta genérica como “continue” não autoriza destruição. Depois da eventual exclusão autorizada, conferir MPG, apps, Machines, volumes, IPs e snapshots e obter evidência do painel de uso/faturamento. Esses passos permanecem pendentes.
 

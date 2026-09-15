@@ -1900,6 +1900,12 @@
   "oldResourceDeletion": {
     "executed": false,
     "notBefore": "2026-09-18T15:00:00Z",
-    "explicitAuthorizationRequired": true
+    "explicitAuthorizationRequired": true,
+    "explicitAuthorizationReceived": true,
+    "authorizationResponse": "autorizo",
+    "authorizationRecordedAt": "2026-09-15T14:56:31Z",
+    "preservationWindowWaived": false,
+    "automaticallyScheduled": false,
+    "targetsRequireRevalidation": true
   }
 }
