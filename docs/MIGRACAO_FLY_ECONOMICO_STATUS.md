@@ -1,8 +1,8 @@
-# Migração econômica SAP — produção e parada antes da exclusão
+# Migração econômica SAP — produção e exclusão autorizada
 
-Estado em 15/09/2026: corte realizado, comparação integral e regressão aprovadas; autorização explícita de exclusão recebida. **Nenhum recurso antigo excluído. Aceite administrativo final ainda pendente**: observação de 72 horas, revalidação dos alvos, exclusão e conferência autenticada de faturamento.
+Estado final técnico em 15/09/2026 às 15:06 UTC: produção nova ativa; backups finais restaurados com comparação integral de 100%; autorização e dispensa expressa das 72 horas recebidas. **Cluster MPG e web antigos excluídos e verificados pelo flyctl. Conferência autenticada do painel de faturamento ainda pendente.** [Comprovantes finais e custos remanescentes](EXCLUSAO_FLY_ECONOMICO_20260915.md). As seções de autorização/janela abaixo registram o histórico anterior; a atualização final prevalece sobre as restrições anteriores de prazo.
 
-Nova URL: https://sap-codigos-economico.fly.dev. O endereço antigo redireciona páginas para ela; exige novo login por mudança de domínio. Excel permanece ferramenta administrativa de carga/auditoria/atualização controlada, não requisito a cada acesso.
+Nova URL: https://sap-codigos-economico.fly.dev. O endereço antigo deixou de funcionar após a exclusão da web antiga; usar a URL nova e realizar novo login por mudança de domínio. Excel permanece ferramenta administrativa de carga/auditoria/atualização controlada, não requisito a cada acesso.
 
 ## Infraestrutura nova ativa
 
@@ -50,9 +50,9 @@ Os US$ 40 aproximados são compatíveis com MPG Basic US$ 38 + disco US$ 2,80. A
 
 Fontes públicas consultadas em 15/09/2026: [preços Fly](https://fly.io/docs/about/pricing/) e [Managed Postgres](https://fly.io/docs/mpg/). [Inventário/custos anteriores](MIGRACAO_ECONOMICA_INVENTARIO_CUSTOS.md).
 
-O painel de faturamento **não foi verificado** nesta continuação via flyctl. Conforme combinado, a conferência autenticada fica manual. Dados de status com campos organizacionais Billable=false não comprovam ausência de cobrança. Não foi atingido custo zero nem economia total enquanto o MPG antigo existir; pode haver cobrança proporcional do período anterior mesmo após exclusão.
+O painel de faturamento **não foi verificado** nesta continuação via flyctl. Conforme combinado, a conferência autenticada fica manual. Dados de status com campos organizacionais Billable=false não comprovam ausência de cobrança. Não foi atingido custo zero. O MPG antigo foi removido nesta execução; pode haver cobrança proporcional do período anterior mesmo após exclusão. A ausência de cobranças residuais dos backups gerenciados ainda listados como metadados precisa ser confirmada no painel/provedor.
 
-## Recursos antigos propostos para exclusão futura — NÃO EXECUTADA
+## Recursos antigos autorizados — inventário anterior à exclusão
 
 | Alvo exato | Identificação e consequência |
 | --- | --- |
@@ -86,6 +86,7 @@ Uma aprovação não dispensa as 72 horas; essa dispensa exigiria declaração e
 Todos completed; a lista mudará enquanto a política do provedor continuar ativa. Reinventariar antes da aprovação/exclusão efetiva.
 
 ```text
+20260915-000242F_20260915-150136I
 20260915-000242F_20260915-140216I
 20260915-000242F_20260915-130020I
 20260915-000242F_20260915-120115D
@@ -113,3 +114,17 @@ Todos completed; a lista mudará enquanto a política do provedor continuar ativ
 20260914-153422F_20260914-160053I
 20260914-153422F
 ```
+
+## Dispensa expressa e preparação para exclusão imediata
+
+Em 15/09/2026, após explicação da janela, o responsável solicitou execução imediata e respondeu “sim confimado” à pergunta que exigia dispensa expressa das 72 horas. Dispensa registrada às 15:03:55 UTC; somente o prazo foi alterado, sem ampliação dos alvos autorizados.
+
+Inventário atualizado: cluster sap-codigos-db/dzx6qo65n3g0jpv5 (interno fly-mpg-wccyph75x1tw7ljj), web sap-codigos-multiusuario/Machine e82d1e90a4ed08, IPv4 compartilhado 66.241.125.54 e IPv6 2a09:8280:1::18e:192f:0. Nenhum volume, IPv4 dedicado ou certificado personalizado na web antiga. Os 27 backups gerenciados do cluster estão listados acima. Anexo sap-codigos-audit-v311-20260914 reconsultado e inexistente como app; nenhuma dependência adicional identificada. A web nova foi verificada conectada exclusivamente ao host privado novo e a referência de soldagem permanece intacta.
+
+Backups imediatamente anteriores à exclusão, ambos em diretórios seguros fora do Git:
+
+- Antigo: SAP-Codigos-Backups/deletion-20260915-150217-old, criado 15:02:35 UTC, dump SHA-256 e9fc8fed2826a06fdda08b3ff6e7c008d6470464b85f765602d66cadcd7267e8.
+- Novo: SAP-Codigos-Backups/deletion-20260915-150217-new, criado 15:02:43 UTC, dump SHA-256 01808f3f160882ce318032d657586a78dea179c5b11a31fa780dfd92b16e2e64.
+- Ambos restaurados efetivamente em bancos novos de teste sap_restore_deletion_old_20260915 e sap_restore_deletion_new_20260915, comparação integral 100%, diferenças vazias, 986 códigos e sequências seguras. Hash integral nos dois casos: 6b0b88aa91138b2e410a737fe2e60d87d7f8e7ac11c8b250a3f204866fff134d.
+
+Excluir o cluster torna irrecuperável pelo recurso antigo a cópia gerenciada e seus backups; os dumps externos foram preservados e têm restauração comprovada. Excluir a web antiga encerra também o redirecionamento do endereço antigo. Nenhum alvo novo ou aplicativo de referência será removido.

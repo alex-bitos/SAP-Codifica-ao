@@ -1,5 +1,9 @@
 # Plano de rollback — Fly econômico
 
+## Atualização após exclusão autorizada — 15/09/2026
+
+O responsável dispensou expressamente as 72 horas; o cluster e a web antigos foram excluídos após backups finais e restaurações novas comprovadas. **O retorno direto aos recursos antigos descrito nas seções históricas abaixo não está mais disponível. Não executar unfreeze nem tentar reconectar ao cluster excluído.** Recuperação agora exige provisionar um recurso independente, restaurar um dump externo protegido, comparar integralmente e somente depois configurar a conexão privada via Fly secrets. Preferir o backup mais recente da produção nova para evitar perda de gravações posteriores. Os dumps imediatamente anteriores à exclusão e seus checksums constam em [EXCLUSAO_FLY_ECONOMICO_20260915.md](EXCLUSAO_FLY_ECONOMICO_20260915.md). A imagem antiga registrada no provedor não tem retenção garantida; os commits permanecem no Git para reconstrução.
+
 ## Estado protegido
 
 O cluster original `dzx6qo65n3g0jpv5` (sap-codigos-db) permanece intacto. O login sap_app foi limitado a Reader pelo comando administrativo oficial `flyctl mpg users set-role`; escrita e escalada para schema_admin foram rejeitadas. Sessões SQL antigas do mesmo login/banco foram encerradas na manutenção. A web antiga mantém sua DATABASE_URL original e bloqueia a API antes da autenticação, evitando atualizações assíncronas de sessões.

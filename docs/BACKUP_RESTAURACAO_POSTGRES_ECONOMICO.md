@@ -1,5 +1,7 @@
 # Backup e restauração do PostgreSQL econômico
 
+Atualização em 15/09/2026: cluster e web antigos excluídos com autorização e dispensa expressa da janela. Dois backups adicionais foram gerados e restaurados efetivamente em bancos novos antes da exclusão, com comparação integral de 100%; [checksums e comprovantes](EXCLUSAO_FLY_ECONOMICO_20260915.md). Não contar com recuperação do recurso antigo; os dumps externos foram preservados.
+
 Banco de produção: `fly-db`, em `sap-codigos-postgres-economico`. Dados persistem no volume criptografado `vol_vjyqoddddne8ooxv`, montado em `/data`; PGDATA = `/data/postgresql`. As tabelas sap_codes, users, categories, technical_references, sequential_counters, audit_log e database_imports são o armazenamento central; a planilha não é o banco da aplicação.
 
 ## Segurança e ferramentas

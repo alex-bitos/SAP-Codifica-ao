@@ -6,6 +6,8 @@ import { TARGET_APP, SOURCE_APP, proxy, connect, profile, secureDirectory } from
 import { WEB_APP, targetConnection } from './migration-target.mjs';
 
 const out = await secureDirectory(process.argv[2]);
+assert(process.argv[3] === undefined || process.argv[3] === '--old-resources-deleted', 'Unrecognized smoke option.');
+const oldResourcesDeleted = process.argv[3] === '--old-resources-deleted';
 const tunnel = await proxy(TARGET_APP, 15532, true);
 let client;
 const temporarySessionIds = [];
@@ -15,11 +17,13 @@ try {
   const tests = [];
   for (const route of ['/health', '/ready', '/']) assert.equal((await fetch(base + route)).status, 200);
   tests.push('HTTPS/frontend/health/readiness');
-  const old = await fetch(`https://${SOURCE_APP}.fly.dev/`, { redirect: 'manual' });
-  assert.equal(old.status, 307);
-  assert.equal(old.headers.get('location'), base + '/');
-  assert.equal((await fetch(`https://${SOURCE_APP}.fly.dev/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 503);
-  tests.push('Old URL redirects pages and rejects API writes before authentication');
+  if (!oldResourcesDeleted) {
+    const old = await fetch(`https://${SOURCE_APP}.fly.dev/`, { redirect: 'manual' });
+    assert.equal(old.status, 307);
+    assert.equal(old.headers.get('location'), base + '/');
+    assert.equal((await fetch(`https://${SOURCE_APP}.fly.dev/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status, 503);
+    tests.push('Old URL redirects pages and rejects API writes before authentication');
+  }
   await client.query('SET ROLE schema_admin');
   const before = await profile(client);
   const users = (await client.query('SELECT id,role FROM users WHERE active=true AND must_change_password=false ORDER BY role')).rows;
@@ -51,7 +55,7 @@ try {
   const after = await profile(client);
   assert.equal(after.sha256, before.sha256, 'Production smoke changed persisted data.');
   tests.push('Writable new application role; temporary smoke sessions removed; all original hashes/rows unchanged');
-  const result = { observedAt: new Date().toISOString(), passed: true, base, targetApp: TARGET_APP, database: 'fly-db', dataHash: after.sha256, tests, businessRowsChanged: false, originalUsersChanged: false, temporarySessionsRemaining: 0 };
+  const result = { observedAt: new Date().toISOString(), passed: true, base, targetApp: TARGET_APP, database: 'fly-db', dataHash: after.sha256, oldResourcesDeleted, tests, businessRowsChanged: false, originalUsersChanged: false, temporarySessionsRemaining: 0 };
   await fs.writeFile(path.join(out, 'production-smoke.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 } finally {

@@ -9,6 +9,8 @@ import { TARGET_APP, safeCommand, proxy, connect, libpqEnvironment, profile, sec
 export const TEST_DB = 'sap_migration_test';
 export const RESTORE_VERIFY_DB = 'sap_restore_verify_20260915';
 export const RESTORE_FINAL_DB = 'sap_restore_final_20260915';
+export const RESTORE_DELETION_OLD_DB = 'sap_restore_deletion_old_20260915';
+export const RESTORE_DELETION_NEW_DB = 'sap_restore_deletion_new_20260915';
 export const WEB_APP = 'sap-codigos-economico';
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
 const quoted = value => '"' + value.replaceAll('"', '""') + '"';
@@ -22,7 +24,7 @@ export function targetPassword(name) {
 }
 
 export function targetConnection(database = 'postgres', appUser = false) {
-  assert(['postgres', 'template1', TEST_DB, RESTORE_VERIFY_DB, RESTORE_FINAL_DB, 'fly-db'].includes(database), 'Unverified target database.');
+  assert(['postgres', 'template1', TEST_DB, RESTORE_VERIFY_DB, RESTORE_FINAL_DB, RESTORE_DELETION_OLD_DB, RESTORE_DELETION_NEW_DB, 'fly-db'].includes(database), 'Unverified target database.');
   const url = new URL(`postgresql://${appUser ? 'sap_app' : 'postgres'}@${TARGET_APP}.internal/${database}`);
   url.password = targetPassword(appUser ? 'SAP_APP_PASSWORD' : 'POSTGRES_PASSWORD');
   return url;
@@ -38,7 +40,7 @@ export function importSecrets(app, entries) {
 }
 
 async function restore(directory, database) {
-  assert([TEST_DB, RESTORE_VERIFY_DB, RESTORE_FINAL_DB, 'fly-db'].includes(database));
+  assert([TEST_DB, RESTORE_VERIFY_DB, RESTORE_FINAL_DB, RESTORE_DELETION_OLD_DB, RESTORE_DELETION_NEW_DB, 'fly-db'].includes(database));
   const out = await secureDirectory(directory);
   const manifest = JSON.parse(await fs.readFile(path.join(out, 'manifest.json'), 'utf8'));
   for (const [file, checksum] of Object.entries(manifest.files)) assert.equal(digest(await fs.readFile(path.join(out, file))), checksum);

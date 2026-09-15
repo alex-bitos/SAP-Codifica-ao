@@ -1898,14 +1898,39 @@
     "users": 3
   },
   "oldResourceDeletion": {
-    "executed": false,
-    "notBefore": "2026-09-18T15:00:00Z",
+    "executed": true,
+    "originalNotBefore": "2026-09-18T15:00:00Z",
     "explicitAuthorizationRequired": true,
     "explicitAuthorizationReceived": true,
     "authorizationResponse": "autorizo",
     "authorizationRecordedAt": "2026-09-15T14:56:31Z",
-    "preservationWindowWaived": false,
+    "preservationWindowWaived": true,
+    "waiverResponse": "sim confimado",
+    "waiverRecordedAt": "2026-09-15T15:03:55Z",
     "automaticallyScheduled": false,
-    "targetsRequireRevalidation": true
+    "targetsRequireRevalidation": false,
+    "verifiedAt": "2026-09-15T15:06:08Z",
+    "commands": [
+      "flyctl mpg destroy dzx6qo65n3g0jpv5 --yes",
+      "flyctl apps destroy sap-codigos-multiusuario --yes"
+    ],
+    "cluster": "dzx6qo65n3g0jpv5",
+    "clusterStatus": "deleted",
+    "oldWebApp": "sap-codigos-multiusuario",
+    "oldWebMachine": "e82d1e90a4ed08",
+    "oldWebAbsent": true,
+    "oldManagedBackupRecordsStillListed": 27,
+    "oldManagedBackupPhysicalPurgeVerified": false,
+    "billingDashboardVerified": false,
+    "backupOldDumpSha256": "e9fc8fed2826a06fdda08b3ff6e7c008d6470464b85f765602d66cadcd7267e8",
+    "backupNewDumpSha256": "01808f3f160882ce318032d657586a78dea179c5b11a31fa780dfd92b16e2e64",
+    "freshRestoreOldDatabase": "sap_restore_deletion_old_20260915",
+    "freshRestoreNewDatabase": "sap_restore_deletion_new_20260915",
+    "freshRestoresFullMatch": true,
+    "postDeletionSmokeAt": "2026-09-15T15:05:29.605Z",
+    "postDeletionSmokePassed": true,
+    "postDeletionDataHash": "6b0b88aa91138b2e410a737fe2e60d87d7f8e7ac11c8b250a3f204866fff134d",
+    "referenceApplicationChanged": false,
+    "finalEvidenceDocument": "EXCLUSAO_FLY_ECONOMICO_20260915.md"
   }
 }
