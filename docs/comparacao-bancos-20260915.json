@@ -1776,7 +1776,7 @@
     "businessRulesChanged": false
   },
   "productionSmoke": {
-    "observedAt": "2026-09-15T14:42:06.868Z",
+    "observedAt": "2026-09-15T14:50:21.150Z",
     "passed": true,
     "base": "https://sap-codigos-economico.fly.dev",
     "targetApp": "sap-codigos-postgres-economico",
@@ -1880,6 +1880,22 @@
     "passed": true,
     "tests": 10,
     "durationSeconds": 48.3
+  },
+  "finalWebDeployment": {
+    "implementationCommit": "51d4ebec6d6a2f5161181d039f2c6acf95322000",
+    "branch": "fix/persistencia-maximesh-produtos-acabados",
+    "pushed": true,
+    "app": "sap-codigos-economico",
+    "machine": "e82d1300f47028",
+    "image": "deployment-01M2JRHDKV446Q8AY41DZSQFG5",
+    "machineUpdatedAt": "2026-09-15T14:47:13Z",
+    "healthChecksPassing": 2,
+    "healthChecksTotal": 2,
+    "runtimeDatabase": "fly-db",
+    "runtimeHost": "sap-codigos-postgres-economico.internal",
+    "runtimeCurrentUser": "schema_admin",
+    "codes": 986,
+    "users": 3
   },
   "oldResourceDeletion": {
     "executed": false,

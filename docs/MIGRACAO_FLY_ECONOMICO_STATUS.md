@@ -10,7 +10,7 @@ Nova URL: https://sap-codigos-economico.fly.dev. O endereço antigo redireciona 
 | --- | --- |
 | Web | sap-codigos-economico |
 | Machine web | e82d1300f47028, gru, shared 1 CPU, 512 MB, 2/2 checks passing |
-| Imagem web | deployment-01M2JPJ0V56X13ZCC67AR7W74H |
+| Imagem web final | deployment-01M2JRHDKV446Q8AY41DZSQFG5 |
 | IPs web | IPv4 compartilhado 66.241.125.46; IPv6 2a09:8280:1::18f:348a:0 |
 | Banco | sap-codigos-postgres-economico, PostgreSQL 16.15, banco lógico fly-db |
 | Machine PG | 28743d9c542408, gru, shared 1 CPU, 256 MB, check database passing |
@@ -27,6 +27,8 @@ Nova URL: https://sap-codigos-economico.fly.dev. O endereço antigo redireciona 
 O ensaio de 20 requisições simultâneas passou em 256 MB. Medição inicial após testes: aproximadamente 120 MB de memória disponível, disco /data com 65 MB usados de 974 MB. Não há réplica/HA; monitorar crescimento e ajustar memória/disco se necessário. Os bancos sap_migration_test, sap_restore_verify_20260915 e sap_restore_final_20260915 permanecem apenas para evidência/ensaio no mesmo volume, não são a produção e não criam Machines extras. Locale/charset e libc 2.41 foram alinhados ao original; dados mantiveram seu hash após REINDEX. A suíte PostgreSQL e o smoke de produção passaram novamente na imagem final.
 
 ## Evidências de dados e testes
+
+Commit de implementação `51d4ebec6d6a2f5161181d039f2c6acf95322000`, enviado ao origin na branch `fix/persistencia-maximesh-produtos-acabados`. Deploy final pelo flyctl aprovado em 15/09/2026, Machine web atualizada às 14:47:13 UTC, 2/2 checks passando. Smoke pós-deploy aprovado às 14:50:21 UTC: HTTPS, catálogos, permissões, redirecionamento antigo e bloqueio da API antiga. Conexão real da web confirmada no host privado novo, banco fly-db, usuário efetivo schema_admin, 986 códigos e 3 usuários; nenhum dado original alterado pelo smoke.
 
 - [Comparação dos bancos](RELATORIO_COMPARACAO_BANCOS.md): 100%, divergências vazias; 986 códigos, 147 categorias, 610 referências, 81 contadores, 3 usuários, 28 auditorias e importação preservada.
 - [Resultado JSON](comparacao-bancos-20260915.json): hashes, lista integral de códigos, limites de IDs/datas e evidências.
