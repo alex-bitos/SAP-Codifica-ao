@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 const baseUrl = process.env.AUDIT_APP_URL;
 const password = process.env.AUDIT_TEST_PASSWORD;
 if (!baseUrl || !password) throw new Error('Defina AUDIT_APP_URL e AUDIT_TEST_PASSWORD para a homologação isolada.');
-const outputDir = path.resolve('docs', 'screenshots-v311');
+const outputDir = path.resolve(process.env.AUDIT_OUTPUT_DIR || path.join('docs', 'screenshots-v311'));
 await fs.mkdir(outputDir, { recursive: true });
 
 const browser = await chromium.launch({ headless: true });

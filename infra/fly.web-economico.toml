@@ -2,7 +2,7 @@ app = "sap-codigos-economico"
 primary_region = "gru"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "../Dockerfile"
 
 [env]
   NODE_ENV = "production"
@@ -11,6 +11,7 @@ primary_region = "gru"
   SESSION_TTL_HOURS = "8"
   LOGIN_MAX_ATTEMPTS = "5"
   LOGIN_LOCK_MINUTES = "15"
+  PG_POOL_MAX = "10"
 
 [deploy]
   release_command = "node dist/cli/migrate.js"

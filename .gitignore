@@ -6,6 +6,10 @@ coverage/
 !.env.example
 *.log
 *.dump
+schema.sql
+profile.json
+manifest.json
+SAP-Codigos-Backups/
 *.sql.gz
 *.bak
 data/

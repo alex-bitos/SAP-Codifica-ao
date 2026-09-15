@@ -1,0 +1,34 @@
+app = "sap-codigos-postgres-economico"
+primary_region = "gru"
+kill_signal = "SIGINT"
+kill_timeout = "30s"
+
+[build]
+  dockerfile = "postgres/Dockerfile"
+
+[env]
+  PGDATA = "/data/postgresql"
+  POSTGRES_DB = "postgres"
+  POSTGRES_USER = "postgres"
+  POSTGRES_INITDB_ARGS = "--auth-host=scram-sha-256 --auth-local=peer"
+
+[[mounts]]
+  source = "sap_pg_data"
+  destination = "/data"
+
+[checks.database]
+  type = "tcp"
+  port = 5432
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "30s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+[[restart]]
+  policy = "always"
+  processes = ["app"]
+
+# Intentionally no public services, IPs, autostop or release command.

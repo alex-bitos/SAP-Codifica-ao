@@ -1,13 +1,13 @@
-app = "sap-codigos-economico"
+app = "sap-codigos-multiusuario"
 primary_region = "gru"
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = "../Dockerfile"
 
 [env]
   NODE_ENV = "production"
   PORT = "3000"
-  ALLOWED_ORIGINS = "https://sap-codigos-economico.fly.dev"
+  ALLOWED_ORIGINS = "https://sap-codigos-multiusuario.fly.dev"
   SESSION_TTL_HOURS = "8"
   LOGIN_MAX_ATTEMPTS = "5"
   LOGIN_LOCK_MINUTES = "15"
@@ -20,7 +20,7 @@ primary_region = "gru"
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ["app"]
 
   [[http_service.checks]]
@@ -40,3 +40,6 @@ primary_region = "gru"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+
+# Historical recovery configuration. The old role is Reader; do not deploy
+# its release command or disable maintenance without the rollback procedure.

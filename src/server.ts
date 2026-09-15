@@ -9,6 +9,7 @@ import { ZodError } from 'zod';
 import { loadConfig } from './config.js';
 import { getPool } from './db.js';
 import routes from './routes.js';
+import { migrationGate } from './migration-gate.js';
 
 export function createApp() {
   const config = loadConfig();
@@ -29,6 +30,7 @@ export function createApp() {
   });
   app.get('/health', (_req, res) => res.json({ status: 'ok' }));
   app.get('/ready', async (_req, res) => { try { await getPool().query('SELECT 1'); res.json({ status: 'ready' }); } catch { res.status(503).json({ status: 'not_ready' }); } });
+  app.use(migrationGate());
   app.use('/api', routes);
   const here = path.dirname(fileURLToPath(import.meta.url)); const projectRoot = path.resolve(here, '..');
   const publicDir = path.join(projectRoot, 'public');

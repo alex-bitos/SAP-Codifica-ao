@@ -71,6 +71,7 @@ async function fillFields(fields) {
 const evidence = [];
 try {
   await login('audit_admin');
+  const initialTotal = await page.evaluate(async () => (await (await fetch('/api/database/status')).json()).counts.codes);
   if (await page.locator('#databaseEmptyWarning').isVisible()) throw new Error('O banco inicializado foi apresentado como vazio.');
   await page.locator('#navigation button[data-view="database"]').click();
   await page.locator('#databaseStatus .metric').first().waitFor();
@@ -130,7 +131,7 @@ try {
   await page.locator('#codesBody tr').first().waitFor();
   const totalText = (await page.locator('#pageInfo').textContent()) || '';
   const sharedTotal = Number(totalText.match(/\d+(?= registro)/)?.[0] || 0);
-  if (sharedTotal !== 1013) throw new Error(`Segundo usuário recebeu ${sharedTotal} códigos; esperados 1013.`);
+  if (sharedTotal !== initialTotal + 22) throw new Error(`Segundo usuário recebeu ${sharedTotal} códigos; esperados ${initialTotal + 22}.`);
   await page.screenshot({ path: path.join(outputDir, '04-segundo-usuario.png'), fullPage: true });
 
   if (browserErrors.length) throw new Error(`Erros no navegador: ${browserErrors.join(' | ')}`);
